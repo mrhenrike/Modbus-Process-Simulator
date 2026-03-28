@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE modbuspal_project SYSTEM "modbuspal.dtd">
+<modbuspal_project>
+<idgen  value="0"/>
+<links selected="TCP/IP" >
+<tcpip port="502" />
+<serial com="COM 1" baudrate="9600" parity="even" stops="1" >
+<flowcontrol xonxoff="false" rtscts="false" />
+</serial>
+</links>
+</modbuspal_project>

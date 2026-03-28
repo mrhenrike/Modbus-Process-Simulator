@@ -1,8 +1,5 @@
-from modbuspal.main import ModbusPal
+# Variavel ModbusPal = projeto atual (injetada pelo ScriptRunner).
+# Nao usar: from modbuspal.main import ModbusPal
 
-# Get the list of all automations in the project
-list = ModbusPal.getAutomations();
-
-# Start every automation in the list
-for automation in list:
-  automation.start();
+for automation in ModbusPal.getAutomations():
+    automation.start()

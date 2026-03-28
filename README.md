@@ -1,9 +1,19 @@
-# Modbus Slave Simulator v1.7 by @mrhenrike
+# Modbus Process Simulator v1.9.0 by @mrhenrike
 ModbusPal - a Java MODBUS simulator
 - Forked by https://sourceforge.net/projects/modbuspal/
 - Changed by André Henrique (Twitter @mrhenrike / LinkedIn @mrhenrike)
 
-This release of ModbusPal Enhanced v1.7 is a release candidate version.
+Latest validated standalone releases in this repository:
+
+- `releases/v1.7/ModbusSlaveSimulator-v1.7.2-standalone.jar`
+- `releases/v1.7/ModbusSlaveSimulator-v1.7.3-standalone.jar`
+- `releases/v1.7/ModbusSlaveSimulator-v1.7.4-standalone.jar`
+- `releases/v1.7/ModbusSlaveSimulator-v1.7.5-standalone.jar`
+- `releases/ModbusProcessPlantSimulator-v1.8.0-standalone.jar`
+- `releases/ModbusProcessPlantSimulator-v1.8.1-standalone.jar`
+- `releases/ModbusProcessSimulator-v1.9.0-standalone.jar`
+
+This branch publishes the newest local evolution of ModbusPal Enhanced, including UI/UX updates, localization support and packaged release artifacts.
 
 ### About ModbusPal Enhanced
 ModbusPal Enhanced is a MODBUS slave simulator improved, based on ModbusPal v1.6b by Community. Its purpose is to offer an easy to use interface with the capabilities to reproduce complex and realistic MODBUS environments. The core of ModbusPal Enhanced is written in Java. TCP/IP is supported natively, and the serial communication is supported if RxTx library is installed on the computer.

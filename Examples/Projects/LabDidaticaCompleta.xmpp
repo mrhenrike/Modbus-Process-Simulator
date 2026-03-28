@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE modbuspal_project SYSTEM "modbuspal.dtd">
+<modbuspal_project>
+<idgen value="100"/>
+<links selected="TCP/IP" >
+<tcpip port="502" />
+<serial com="COM 1" baudrate="9600" parity="even" stops="1" >
+<flowcontrol xonxoff="false" rtscts="false" />
+</serial>
+</links>
+
+<automation name="Lab-Voltage" step="1.0" loop="true" init="0.0">
+<generator class="RandomGenerator" duration="10.0">
+<min value="115.0" relative="false"/>
+<max value="127.0" relative="false"/>
+</generator>
+</automation>
+
+<automation name="Lab-Temperature" step="1.0" loop="true" init="0.0">
+<generator class="SineGenerator" duration="10.0">
+<amplitude value="10.0" />
+<period value="5.0" />
+<offset value="150.0" />
+<catchup enabled="true" />
+</generator>
+</automation>
+
+<automation name="Lab-RPM" step="1.0" loop="true" init="0.0">
+<generator class="LinearGenerator" duration="5.0">
+<start value="5500.0" relative="false"/>
+<end value="5600.0" relative="false"/>
+</generator>
+</automation>
+
+<automation name="Lab-Triangle" step="0.5" loop="true" init="0.0">
+<generator class="LinearGenerator" duration="10.0">
+<start value="0.0" relative="false"/>
+<end value="100.0" relative="false"/>
+</generator>
+<generator class="LinearGenerator" duration="10.0">
+<start value="100.0" relative="false"/>
+<end value="0.0" relative="false"/>
+</generator>
+</automation>
+
+<slave id="127.0.0.1(1)" enabled="true" name="LabProcess" implementation="modbus">
+<holding_registers>
+<register address="0" value="0" name="PV_Voltage">
+<binding automation="Lab-Voltage" class="Binding_SINT16" order="0"/>
+</register>
+<register address="1" value="120" name="SP_OutputVoltage"/>
+<register address="2" value="110" name="MinOutputVoltage"/>
+<register address="3" value="130" name="MaxOutputVoltage"/>
+<register address="4" value="0" name="PV_Temperature">
+<binding automation="Lab-Temperature" class="Binding_SINT16" order="0"/>
+</register>
+<register address="5" value="140" name="MinTemperature"/>
+<register address="6" value="160" name="MaxTemperature"/>
+<register address="7" value="0" name="PV_RPM">
+<binding automation="Lab-RPM" class="Binding_SINT16" order="0"/>
+</register>
+<register address="8" value="5500" name="MinRPM"/>
+<register address="9" value="5600" name="MaxRPM"/>
+<register address="10" value="0" name="PV_Triangle">
+<binding automation="Lab-Triangle" class="Binding_SINT16" order="0"/>
+</register>
+<register address="11" value="0" name="Reserved_11"/>
+<register address="12" value="0" name="Reserved_12"/>
+<register address="13" value="0" name="Reserved_13"/>
+<register address="14" value="0" name="Reserved_14"/>
+<register address="15" value="0" name="Reserved_15"/>
+</holding_registers>
+<input_registers>
+<register address="0" value="0" name="IN_Voltage">
+<binding automation="Lab-Voltage" class="Binding_SINT16" order="0"/>
+</register>
+<register address="1" value="0" name="IN_Temperature">
+<binding automation="Lab-Temperature" class="Binding_SINT16" order="0"/>
+</register>
+<register address="2" value="0" name="IN_RPM">
+<binding automation="Lab-RPM" class="Binding_SINT16" order="0"/>
+</register>
+</input_registers>
+<coils>
+<coil address="0" value="1" name="CMD_Run"/>
+<coil address="1" value="0" name="CMD_Reset"/>
+<coil address="2" value="0" name="ALM_HighTemp"/>
+<coil address="3" value="0" name="ALM_HighRPM"/>
+</coils>
+<input_coils>
+<coil address="0" value="1" name="STS_Ready"/>
+<coil address="1" value="0" name="STS_Alarm"/>
+</input_coils>
+<tuning>
+<reply_delay min="5" max="25" />
+<error_rates no_reply="0.0" />
+</tuning>
+</slave>
+
+<startup>
+<script>
+<abs>unused</abs>
+<rel>../Automations/Lab_StartAllAutomations.py</rel>
+</script>
+</startup>
+
+<ondemand>
+<script>
+<abs>unused</abs>
+<rel>../Automations/Lab_StartAllAutomations.py</rel>
+</script>
+<script>
+<abs>unused</abs>
+<rel>../Automations/Lab_DisableAllSlaves.py</rel>
+</script>
+<script>
+<abs>unused</abs>
+<rel>../Automations/Lab_EnableAllSlaves.py</rel>
+</script>
+<script>
+<abs>unused</abs>
+<rel>../Automations/HelloWorldStartup.py</rel>
+</script>
+</ondemand>
+</modbuspal_project>

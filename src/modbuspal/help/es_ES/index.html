@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es-ES">
+<head>
+  <meta charset="UTF-8">
+  <title>Guía Operativa - Modbus Process Plant Simulator</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.5; }
+    h1, h2 { color: #1f3b4d; }
+    code { background: #f2f4f6; padding: 1px 4px; }
+    .note { border-left: 4px solid #2b7; padding: 8px 12px; background: #f5fffa; }
+    .warn { border-left: 4px solid #d68a00; padding: 8px 12px; background: #fff9ed; }
+    .nav a { margin-right: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Modbus Process Plant Simulator - Guía Operativa</h1>
+  <p>Guía principal para simulación de planta y prácticas MODBUS.</p>
+
+  <div class="nav">
+    <a href="workflow.html">Flujo paso a paso</a>
+    <a href="troubleshooting.html">Troubleshooting</a>
+  </div>
+
+  <h2>1) Estructura de interfaz</h2>
+  <ul>
+    <li><b>Menú Project</b>: cargar/guardar/limpiar proyecto.</li>
+    <li><b>Menú Tools</b>: Master, Scripts, Console, Verificar dependencias.</li>
+    <li><b>Menú Ayuda</b>: documentación y guías operativas contextuales.</li>
+    <li><b>Menú Language</b>: cambio de idioma en tiempo real.</li>
+    <li><b>Menú Salir</b>: cierre con persistencia de sesión.</li>
+    <li><b>Panel de conexión</b>: Link settings + Run/Learn/Record.</li>
+  </ul>
+
+  <h2>2) Controles de ejecución</h2>
+  <ul>
+    <li><b>Run</b>: inicia/detiene el enlace seleccionado.</li>
+    <li><b>Learn</b>: crea puntos automáticamente en escrituras nuevas.</li>
+    <li><b>Record</b>: registra tráfico MODBUS para replay.</li>
+    <li><b>ASCII</b>: habilita framing MODBUS ASCII en serial.</li>
+  </ul>
+
+  <h2>3) Conceptos MODBUS y de proceso</h2>
+  <ul>
+    <li><b>Holding Registers</b>: consignas y comandos (R/W).</li>
+    <li><b>Input Registers</b>: telemetría de proceso (R).</li>
+    <li><b>Coils</b>: comandos booleanos (R/W).</li>
+    <li><b>Input Coils</b>: estados y alarmas (R).</li>
+    <li><b>Bindings</b>: conversión de tipos.</li>
+    <li><b>Functions</b>: lógica personalizada por esclavo.</li>
+  </ul>
+
+  <div class="note">
+    <b>Puerto 502:</b> endpoint estándar MODBUS/TCP. Error de bind indica puerto ocupado.
+  </div>
+  <div class="warn">
+    <b>Serial en JDK moderno:</b> RXTX puede quedar limitado; use TCP/IP o Replay cuando sea necesario.
+  </div>
+
+  <h2>4) Referencias de capturas</h2>
+  <p>Capturas usadas en esta fase, ubicadas en <code>Docs/</code>:</p>
+  <ul>
+    <li><code>screenshot_modbuspalframe.jpg</code></li>
+    <li><code>screenshot_automationeditor.jpg</code></li>
+    <li><code>screenshot_slaveeditor.jpg</code></li>
+  </ul>
+</body>
+</html>

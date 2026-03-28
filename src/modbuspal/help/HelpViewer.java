@@ -17,6 +17,8 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
 import javax.swing.JFrame;
+import modbuspal.main.LanguageManager;
+import modbuspal.main.ModbusPalPane;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 
@@ -37,16 +39,7 @@ implements HyperlinkListener
         initComponents();
         Image img = Toolkit.getDefaultToolkit().createImage( getClass().getResource("/modbuspal/main/img/icon32.png") );
         setIconImage(img);
-
-        try
-        {
-            URL url = getClass().getResource("index.html");
-            addTab("Index",url);
-        }
-        catch(IOException ex)
-        {
-            ex.printStackTrace();
-        }
+        reloadLocalizedIndex();
     }
 
     private void addTab(String title, URL url) throws IOException
@@ -60,6 +53,27 @@ implements HyperlinkListener
             pane.addHyperlinkListener(this);
         }
         jTabbedPane1.setSelectedComponent(pane);
+    }
+
+    public final void reloadLocalizedIndex()
+    {
+        panes.clear();
+        jTabbedPane1.removeAll();
+        setTitle(LanguageManager.tr("title.help", ModbusPalPane.APP_NAME));
+        try
+        {
+            String localeTag = LanguageManager.getLocale().toLanguageTag().replace('-', '_');
+            URL url = getClass().getResource("/modbuspal/help/" + localeTag + "/index.html");
+            if( url == null )
+            {
+                url = getClass().getResource("/modbuspal/help/en_US/index.html");
+            }
+            addTab(LanguageManager.tr("help.index"), url);
+        }
+        catch(IOException ex)
+        {
+            ex.printStackTrace();
+        }
     }
 
     /** This method is called from within the constructor to

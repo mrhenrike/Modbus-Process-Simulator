@@ -12,6 +12,7 @@
 package modbuspal.slave;
 
 import java.awt.event.KeyEvent;
+import javax.swing.SwingUtilities;
 import javax.swing.event.AncestorEvent;
 import modbuspal.toolkit.GUITools;
 import modbuspal.main.*;
@@ -42,6 +43,7 @@ implements WindowListener, ModbusSlaveListener,AncestorListener
         modbusSlave = s;
         modbusPalPane = p;
         modbusPalProject = modbusPalPane.getProject();
+        modbusSlave.addModbusSlaveListener(this);
         modbusSlaveDialog = new ModbusSlaveDialog(modbusPalPane, modbusSlave);
         modbusSlaveDialog.addWindowListener(this);
         initComponents();
@@ -63,6 +65,7 @@ implements WindowListener, ModbusSlaveListener,AncestorListener
      */
     public void delete()
     {
+       modbusSlave.removeModbusSlaveListener(this);
        if( modbusSlaveDialog != null )
        {
             modbusSlaveDialog.removeWindowListener(this);
@@ -282,8 +285,23 @@ implements WindowListener, ModbusSlaveListener,AncestorListener
     {
         if(slave==modbusSlave)
         {
-            enableToggleButton.setSelected(enabled);
-            setBackground(enabled);
+            Runnable ui = new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    enableToggleButton.setSelected(enabled);
+                    setBackground(enabled);
+                }
+            };
+            if( SwingUtilities.isEventDispatchThread() )
+            {
+                ui.run();
+            }
+            else
+            {
+                SwingUtilities.invokeLater(ui);
+            }
         }
     }
 
@@ -313,7 +331,22 @@ implements WindowListener, ModbusSlaveListener,AncestorListener
     @Override
     public void modbusSlaveNameChanged(ModbusSlave slave, String newName)
     {
-        nameTextField.setText(newName);
+        Runnable ui = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                nameTextField.setText(newName);
+            }
+        };
+        if( SwingUtilities.isEventDispatchThread() )
+        {
+            ui.run();
+        }
+        else
+        {
+            SwingUtilities.invokeLater(ui);
+        }
     }
 
     @Override
@@ -328,6 +361,7 @@ implements WindowListener, ModbusSlaveListener,AncestorListener
     @Override
     public void ancestorRemoved(AncestorEvent event)
     {
+        modbusSlave.removeModbusSlaveListener(this);
         modbusSlaveDialog.removeWindowListener(this);
         modbusSlaveDialog.setVisible(false);
         modbusSlaveDialog.dispose();

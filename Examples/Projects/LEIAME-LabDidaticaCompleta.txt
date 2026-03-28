@@ -1,0 +1,17 @@
+Projeto: LabDidaticaCompleta.xmpp
+================================
+
+Objetivo: laboratorio completo com varias automacoes (tensao aleatoria, temperatura senoidal,
+RPM em rampa, sinal triangular) ligadas a registos de processo. Registos SP_* e limites podem
+ser escritos por Modbus (funcao 0x06 / 0x10) para observar o efeito nas PV_* e nos graficos
+na edicao de cada automacao (botao Chart).
+
+Como abrir:
+- File > Load e escolha LabDidaticaCompleta.xmpp (mantenha a pasta Examples intacta para os
+  caminhos relativos dos scripts .py).
+
+Scripts sob demanda (botao Scripts no simulador):
+- Lab_StartAllAutomations.py, Lab_DisableAllSlaves.py, Lab_EnableAllSlaves.py
+- HelloWorldStartup.py (janela de demonstracao Swing)
+
+TCP: porta 502 (padrao Modbus). Escravo Modbus ID 1.

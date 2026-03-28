@@ -24,6 +24,7 @@ import java.util.prefs.Preferences;
 import javax.swing.JFileChooser;
 import javax.swing.JPanel;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import modbuspal.main.LanguageManager;
 import modbuspal.main.ListLayout;
 import modbuspal.main.ModbusPalPane;
 import modbuspal.main.ModbusPalProject;
@@ -61,9 +62,17 @@ implements ScriptListener, FileTransferHandler.FileTransferTarget
     {
         super();
         initComponents();
+        refreshLocalization();
         Image img = Toolkit.getDefaultToolkit().createImage( getClass().getResource("/modbuspal/main/img/icon32.png") );
         setIconImage(img);
         scriptsList.setDropTarget( new DropTarget(this, new FileTransferHandler(this) ) );
+    }
+
+    public final void refreshLocalization()
+    {
+        setTitle(LanguageManager.tr("script.manager.title"));
+        jTabbedPane1.setTitleAt(0, LanguageManager.tr("script.manager.tab"));
+        addScriptButton.setText(LanguageManager.tr("script.manager.add"));
     }
 
 

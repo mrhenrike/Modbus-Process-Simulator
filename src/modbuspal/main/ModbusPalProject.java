@@ -23,7 +23,10 @@ import modbuspal.binding.Binding;
 import modbuspal.generator.Generator;
 import modbuspal.instanciator.InstantiableManager;
 import modbuspal.link.ModbusSerialLink;
+import modbuspal.master.ModbusMasterDelay;
+import modbuspal.master.ModbusMasterRequest;
 import modbuspal.master.ModbusMasterTask;
+import modbuspal.master.ModbusMasterTarget;
 import modbuspal.script.ScriptListener;
 import modbuspal.script.ScriptRunner;
 import modbuspal.slave.ModbusSlave;
@@ -164,6 +167,7 @@ implements ModbusPalXML
         
         loadAutomations(doc);
         loadSlaves(doc);
+        loadMasterTasks(doc);
         loadBindings(doc,null);
         
         // execute startup scripts
@@ -215,6 +219,7 @@ implements ModbusPalXML
         
         loadAutomations(doc);
         loadSlaves(doc);
+        loadMasterTasks(doc);
         loadBindings(doc,null);
         
         // execute startup scripts
@@ -437,6 +442,215 @@ implements ModbusPalXML
             //slave.load( slaveNode );
             ModbusSlave slave = new ModbusSlave( this, slaveNode );
             addModbusSlave( slave );
+        }
+    }
+
+    private void loadMasterTasks(Document doc)
+    {
+        NodeList roots = doc.getElementsByTagName("master_tasks");
+        for(int i=0; i<roots.getLength(); i++)
+        {
+            Node root = roots.item(i);
+            NodeList children = root.getChildNodes();
+            for(int j=0; j<children.getLength(); j++)
+            {
+                Node taskNode = children.item(j);
+                if( taskNode.getNodeName().compareTo("task")==0 )
+                {
+                    ModbusMasterTask task = loadMasterTask(taskNode);
+                    if( task != null )
+                    {
+                        addModbusMasterTask(task);
+                    }
+                }
+            }
+        }
+    }
+
+    private ModbusMasterTask loadMasterTask(Node taskNode)
+    {
+        String taskName = XMLTools.getAttribute("name", taskNode);
+        if( taskName == null || taskName.trim().isEmpty() )
+        {
+            taskName = ModbusMasterTask.DEFAULT_NAME;
+        }
+
+        ModbusMasterTask task = new ModbusMasterTask();
+        task.setTaskName(taskName);
+
+        NodeList targets = taskNode.getChildNodes();
+        for(int i=0; i<targets.getLength(); i++)
+        {
+            Node targetNode = targets.item(i);
+            if( targetNode.getNodeName().compareTo("target")==0 )
+            {
+                ModbusMasterTarget target = loadMasterTarget(targetNode);
+                if( target != null )
+                {
+                    task.add(target);
+                }
+            }
+        }
+        return task;
+    }
+
+    private ModbusMasterTarget loadMasterTarget(Node targetNode)
+    {
+        ModbusMasterTarget target = new ModbusMasterTarget();
+
+        String targetName = XMLTools.getAttribute("name", targetNode);
+        if( targetName == null || targetName.trim().isEmpty() )
+        {
+            targetName = "target";
+        }
+        target.setTargetName(targetName);
+
+        String listText = XMLTools.getAttribute("list_text", targetNode);
+        if( listText == null )
+        {
+            listText = "";
+        }
+        target.setTargetListAsText(listText);
+
+        ArrayList<ModbusSlaveAddress> addresses = new ArrayList<ModbusSlaveAddress>();
+        NodeList childNodes = targetNode.getChildNodes();
+        for(int i=0; i<childNodes.getLength(); i++)
+        {
+            Node child = childNodes.item(i);
+            if( child.getNodeName().compareTo("address")==0 )
+            {
+                String addrText = XMLTools.getAttribute("value", child);
+                ModbusSlaveAddress address = parseMasterAddress(addrText);
+                if( address != null )
+                {
+                    addresses.add(address);
+                }
+            }
+        }
+
+        if( addresses.isEmpty() )
+        {
+            ModbusSlaveAddress fallback = parseMasterAddress(listText);
+            if( fallback != null )
+            {
+                addresses.add(fallback);
+            }
+        }
+
+        if( addresses.isEmpty() )
+        {
+            return null;
+        }
+
+        target.setTargetList(addresses.toArray(new ModbusSlaveAddress[0]));
+
+        for(int i=0; i<childNodes.getLength(); i++)
+        {
+            Node child = childNodes.item(i);
+            if( child.getNodeName().compareTo("request")==0 )
+            {
+                ModbusMasterRequest req = loadMasterRequest(child);
+                if( req != null )
+                {
+                    target.add(req);
+                }
+            }
+        }
+        return target;
+    }
+
+    private ModbusSlaveAddress parseMasterAddress(String text)
+    {
+        if( text == null )
+        {
+            return null;
+        }
+        String trimmed = text.trim();
+        if( trimmed.isEmpty() )
+        {
+            return null;
+        }
+
+        try
+        {
+            List<ModbusSlaveAddress> parsed = ModbusSlaveAddress.tryParseIpAddress_1(trimmed);
+            if( parsed != null && parsed.isEmpty()==false )
+            {
+                return parsed.get(0);
+            }
+        }
+        catch(Exception ignored)
+        {
+        }
+
+        try
+        {
+            int rtu = Integer.parseInt(trimmed);
+            return new ModbusSlaveAddress(rtu);
+        }
+        catch(Exception ignored)
+        {
+        }
+
+        return null;
+    }
+
+    private int readIntAttribute(Node node, String attr, int fallback)
+    {
+        String text = XMLTools.getAttribute(attr, node);
+        if( text == null )
+        {
+            return fallback;
+        }
+        try
+        {
+            return Integer.parseInt(text);
+        }
+        catch(Exception ex)
+        {
+            return fallback;
+        }
+    }
+
+    private ModbusMasterRequest loadMasterRequest(Node requestNode)
+    {
+        String type = XMLTools.getAttribute("type", requestNode);
+        if( "delay".equalsIgnoreCase(type) )
+        {
+            int delayMs = readIntAttribute(requestNode, "delay_ms", 1000);
+            if( delayMs < 0 )
+            {
+                delayMs = 0;
+            }
+            return ModbusMasterDelay.getDelay(delayMs);
+        }
+
+        int function = readIntAttribute(requestNode, "function", 3);
+        int readStart = readIntAttribute(requestNode, "read_start", 0);
+        int readQty = readIntAttribute(requestNode, "read_qty", 1);
+        int writeStart = readIntAttribute(requestNode, "write_start", 0);
+        int writeQty = readIntAttribute(requestNode, "write_qty", 1);
+
+        switch(function)
+        {
+            case 1:
+                return ModbusMasterRequest.getReadCoilsRequest(readStart, readQty);
+            case 2:
+                return ModbusMasterRequest.getReadDiscreteInputsRequest(readStart, readQty);
+            case 3:
+                return ModbusMasterRequest.getReadHoldingRegistersRequest(readStart, readQty);
+            case 5:
+                return ModbusMasterRequest.getWriteSingleCoilRequest(writeStart);
+            case 6:
+                return ModbusMasterRequest.getWriteSingleRegisterRequest(writeStart);
+            case 15:
+                return ModbusMasterRequest.getWriteMultipleCoilsRequest(writeStart, writeQty);
+            case 16:
+                return ModbusMasterRequest.getWriteMultipleRegistersRequest(writeStart, writeQty);
+            case 23:
+                return ModbusMasterRequest.getReadWriteMultipleRegistersRequest(readStart, readQty, writeStart, writeQty);
+            default:
+                return null;
         }
     }
 
@@ -706,6 +920,7 @@ implements ModbusPalXML
         saveParameters(out);
         saveAutomations(out);
         saveSlaves(out);
+        saveMasterTasks(out);
         saveScripts(out, projectFile);
 
         String closeTag = "</modbuspal_project>\r\n";
@@ -865,6 +1080,113 @@ implements ModbusPalXML
 
         String closeTag = "</scripts>\r\n";
         out.write(closeTag.getBytes());
+    }
+
+    private String escapeXml(String text)
+    {
+        if( text == null )
+        {
+            return "";
+        }
+        return text
+                .replace("&", "&amp;")
+                .replace("\"", "&quot;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+    }
+
+    private void saveMasterTasks(OutputStream out)
+    throws IOException
+    {
+        if( masterTasks.isEmpty() )
+        {
+            return;
+        }
+
+        out.write("<master_tasks>\r\n".getBytes());
+        for(ModbusMasterTask task : masterTasks)
+        {
+            if( task == null )
+            {
+                continue;
+            }
+            saveMasterTask(out, task);
+        }
+        out.write("</master_tasks>\r\n".getBytes());
+    }
+
+    private void saveMasterTask(OutputStream out, ModbusMasterTask task)
+    throws IOException
+    {
+        StringBuilder openTask = new StringBuilder("<task name=\"");
+        openTask.append(escapeXml(task.getTaskName())).append("\">\r\n");
+        out.write(openTask.toString().getBytes());
+
+        for(int i=0; i<task.getChildCount(); i++)
+        {
+            Object child = task.getChildAt(i);
+            if( child instanceof ModbusMasterTarget )
+            {
+                saveMasterTarget(out, (ModbusMasterTarget)child);
+            }
+        }
+
+        out.write("</task>\r\n".getBytes());
+    }
+
+    private void saveMasterTarget(OutputStream out, ModbusMasterTarget target)
+    throws IOException
+    {
+        StringBuilder openTarget = new StringBuilder("<target name=\"");
+        openTarget.append(escapeXml(target.getTargetName())).append("\" list_text=\"");
+        openTarget.append(escapeXml(target.getTargetListAsText())).append("\">\r\n");
+        out.write(openTarget.toString().getBytes());
+
+        for(ModbusSlaveAddress addr : target.getTargetList())
+        {
+            if( addr == null )
+            {
+                continue;
+            }
+            StringBuilder aTag = new StringBuilder("<address value=\"");
+            aTag.append(escapeXml(addr.toString())).append("\" />\r\n");
+            out.write(aTag.toString().getBytes());
+        }
+
+        for(int i=0; i<target.getChildCount(); i++)
+        {
+            Object child = target.getChildAt(i);
+            if( child instanceof ModbusMasterRequest )
+            {
+                saveMasterRequest(out, (ModbusMasterRequest)child);
+            }
+        }
+
+        out.write("</target>\r\n".getBytes());
+    }
+
+    private void saveMasterRequest(OutputStream out, ModbusMasterRequest request)
+    throws IOException
+    {
+        StringBuilder tag = new StringBuilder("<request ");
+        if( request instanceof ModbusMasterDelay )
+        {
+            ModbusMasterDelay delay = (ModbusMasterDelay)request;
+            tag.append("type=\"delay\" ");
+            tag.append("delay_ms=\"").append(delay.getDelay()).append("\" ");
+            tag.append("/>\r\n");
+            out.write(tag.toString().getBytes());
+            return;
+        }
+
+        tag.append("type=\"modbus\" ");
+        tag.append("function=\"").append(request.getFunctionCode() & 0xFF).append("\" ");
+        tag.append("read_start=\"").append(request.getReadAddress()).append("\" ");
+        tag.append("read_qty=\"").append(request.getReadQuantity()).append("\" ");
+        tag.append("write_start=\"").append(request.getWriteAddress()).append("\" ");
+        tag.append("write_qty=\"").append(request.getWriteQuantity()).append("\" ");
+        tag.append("/>\r\n");
+        out.write(tag.toString().getBytes());
     }
 
 
@@ -2128,7 +2450,7 @@ implements ModbusPalXML
     {
         if( masterTasks.contains(mmt)==true )
         {
-            masterTasks.add(mmt);
+            masterTasks.remove(mmt);
             notifyModbusMasterTaskRemoved(mmt);
         }
     }

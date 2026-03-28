@@ -726,12 +726,29 @@ implements ModbusPalXML, ModbusConst
             	String id = XMLTools.getAttribute(XML_SLAVE_ID_ATTRIBUTE, node);
             	try 
             	{
-                        List<ModbusSlaveAddress> addresses =  ModbusSlaveAddress.tryParseIpAddress_1(id);
-                        slaveId = addresses.get(0);
+                        List<ModbusSlaveAddress> addresses = ModbusSlaveAddress.tryParseIpAddress_1(id);
+                        if( addresses != null && addresses.isEmpty()==false )
+                        {
+                            slaveId = addresses.get(0);
+                        }
+                        else
+                        {
+                            throw new IllegalArgumentException("No address parsed");
+                        }
             	} 
             	catch (Exception exception) 
             	{
-            		System.out.println( "Unknown host while loading Modbus Slave: " + id );
+                        // Backward compatibility for plain RTU ids such as "1".
+                        try
+                        {
+                            int rtuId = Integer.parseInt(id);
+                            slaveId = new ModbusSlaveAddress(rtuId);
+                        }
+                        catch (Exception ignored)
+                        {
+                            System.out.println( "Unknown host while loading Modbus Slave: " + id );
+                            slaveId = new ModbusSlaveAddress(ModbusConst.FIRST_MODBUS_SLAVE);
+                        }
             	}
             }
 
@@ -985,7 +1002,10 @@ implements ModbusPalXML, ModbusConst
 
         // load settings
         Node settings = XMLTools.getNode(node.getChildNodes(), XML_FUNCTION_SETTINGS_TAG);
-        mpp.loadPduProcessorSettings(settings.getChildNodes());
+        if( settings != null )
+        {
+            mpp.loadPduProcessorSettings(settings.getChildNodes());
+        }
     }
 
 
@@ -1040,6 +1060,11 @@ implements ModbusPalXML, ModbusConst
 
     private void loadTuning(Node node)
     {
+        if( node == null )
+        {
+            clearTuning();
+            return;
+        }
         NodeList list = node.getChildNodes();
 
         // look for "reply delay"

@@ -13,6 +13,7 @@
 package modbuspal.automation;
 
 import java.awt.event.KeyEvent;
+import javax.swing.SwingUtilities;
 import javax.swing.event.AncestorEvent;
 import modbuspal.main.*;
 import java.awt.event.WindowEvent;
@@ -280,18 +281,44 @@ implements WindowListener, AutomationExecutionListener, AncestorListener
 
     public void automationHasEnded(Automation source)
     {
-        //playToggleButton.setText("Start");
-        playToggleButton.setSelected(false);
-        setBackground(false);
-        automation.stop();
+        Runnable ui = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                playToggleButton.setSelected(false);
+                setBackground(false);
+            }
+        };
+        if( SwingUtilities.isEventDispatchThread() )
+        {
+            ui.run();
+        }
+        else
+        {
+            SwingUtilities.invokeLater(ui);
+        }
     }
 
     public void automationHasStarted(Automation aThis)
     {
-        //playToggleButton.setText("Stop");
-        playToggleButton.setSelected(true);
-        setBackground(true);
-        automation.start();
+        Runnable ui = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                playToggleButton.setSelected(true);
+                setBackground(true);
+            }
+        };
+        if( SwingUtilities.isEventDispatchThread() )
+        {
+            ui.run();
+        }
+        else
+        {
+            SwingUtilities.invokeLater(ui);
+        }
     }
 
     @Override

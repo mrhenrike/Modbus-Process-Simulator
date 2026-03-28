@@ -5,6 +5,7 @@
 package modbuspal.master;
 
 import javax.swing.tree.DefaultMutableTreeNode;
+import modbuspal.main.LanguageManager;
 
 /**
  *
@@ -15,7 +16,7 @@ extends DefaultMutableTreeNode
 {
     public ModbusMasterRoot()
     {
-        setUserObject("Tasks");
+        setUserObject(LanguageManager.tr("master.tasks_root"));
     }
     
     

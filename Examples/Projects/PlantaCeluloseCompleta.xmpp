@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!DOCTYPE modbuspal_project SYSTEM "modbuspal.dtd">
+<modbuspal_project>
+<idgen value="300"/>
+<links selected="TCP/IP" >
+<tcpip port="502" />
+<serial com="COM 1" baudrate="9600" parity="even" stops="1" >
+<flowcontrol xonxoff="false" rtscts="false" />
+</serial>
+</links>
+
+<automation name="Auto_VoltageLine" step="1.0" loop="true" init="0.0">
+<generator class="RandomGenerator" duration="8.0">
+<min value="385.0" relative="false"/>
+<max value="420.0" relative="false"/>
+</generator>
+</automation>
+
+<automation name="Auto_LoadKW" step="1.0" loop="true" init="0.0">
+<generator class="SineGenerator" duration="20.0">
+<amplitude value="130.0" />
+<period value="12.0" />
+<offset value="760.0" />
+<catchup enabled="true" />
+</generator>
+</automation>
+
+<automation name="Auto_CentrifugeRPM" step="1.0" loop="true" init="0.0">
+<generator class="LinearGenerator" duration="10.0">
+<start value="5250.0" relative="false"/>
+<end value="5650.0" relative="false"/>
+</generator>
+<generator class="LinearGenerator" duration="10.0">
+<start value="5650.0" relative="false"/>
+<end value="5250.0" relative="false"/>
+</generator>
+</automation>
+
+<automation name="Auto_CentrifugeVibration" step="1.0" loop="true" init="0.0">
+<generator class="RandomGenerator" duration="6.0">
+<min value="8.0" relative="false"/>
+<max value="30.0" relative="false"/>
+</generator>
+</automation>
+
+<automation name="Auto_CentrifugeTemp" step="1.0" loop="true" init="0.0">
+<generator class="SineGenerator" duration="12.0">
+<amplitude value="9.0" />
+<period value="8.0" />
+<offset value="86.0" />
+<catchup enabled="true" />
+</generator>
+</automation>
+
+<automation name="Auto_DigesterTemp" step="1.0" loop="true" init="0.0">
+<generator class="SineGenerator" duration="15.0">
+<amplitude value="6.0" />
+<period value="10.0" />
+<offset value="171.0" />
+<catchup enabled="true" />
+</generator>
+</automation>
+
+<automation name="Auto_DigesterPressure" step="1.0" loop="true" init="0.0">
+<generator class="SineGenerator" duration="16.0">
+<amplitude value="1.5" />
+<period value="9.0" />
+<offset value="8.0" />
+<catchup enabled="true" />
+</generator>
+</automation>
+
+<automation name="Auto_DigesterLevel" step="1.0" loop="true" init="0.0">
+<generator class="RandomGenerator" duration="12.0">
+<min value="58.0" relative="false"/>
+<max value="84.0" relative="false"/>
+</generator>
+</automation>
+
+<slave id="127.0.0.1(1)" enabled="true" name="SubestacaoEletrica" implementation="modbus">
+<holding_registers>
+<register address="0" value="0" name="PV_Voltage"><binding automation="Auto_VoltageLine" class="Binding_SINT16" order="0"/></register>
+<register address="1" value="400" name="SP_Voltage"/>
+<register address="2" value="380" name="Limit_LowVoltage"/>
+<register address="3" value="430" name="Limit_HighVoltage"/>
+<register address="4" value="0" name="AlarmWord"/>
+<register address="5" value="0" name="PV_LoadKW"><binding automation="Auto_LoadKW" class="Binding_SINT16" order="0"/></register>
+<register address="6" value="900" name="SP_LoadLimitKW"/>
+</holding_registers>
+<input_registers>
+<register address="0" value="0" name="IN_Voltage"><binding automation="Auto_VoltageLine" class="Binding_SINT16" order="0"/></register>
+<register address="1" value="0" name="IN_LoadKW"><binding automation="Auto_LoadKW" class="Binding_SINT16" order="0"/></register>
+</input_registers>
+<coils>
+<coil address="0" value="1" name="CMD_FeederEnable"/>
+<coil address="1" value="0" name="CMD_ResetAlarms"/>
+<coil address="2" value="0" name="ALM_HighVoltage"/>
+<coil address="3" value="0" name="ALM_LowVoltage"/>
+<coil address="4" value="0" name="ALM_Overload"/>
+</coils>
+<input_coils>
+<coil address="0" value="1" name="STS_BreakerClosed"/>
+<coil address="1" value="0" name="STS_AlarmActive"/>
+</input_coils>
+<tuning>
+<reply_delay min="5" max="45" />
+<error_rates no_reply="0.0" />
+</tuning>
+</slave>
+
+<slave id="127.0.0.1(2)" enabled="true" name="CentrifugaLinhaA" implementation="modbus">
+<holding_registers>
+<register address="0" value="0" name="PV_RPM"><binding automation="Auto_CentrifugeRPM" class="Binding_SINT16" order="0"/></register>
+<register address="1" value="5500" name="SP_RPM"/>
+<register address="2" value="0" name="PV_Vibration"><binding automation="Auto_CentrifugeVibration" class="Binding_SINT16" order="0"/></register>
+<register address="3" value="25" name="SP_MaxVibration"/>
+<register address="4" value="0" name="PV_BearingTemp"><binding automation="Auto_CentrifugeTemp" class="Binding_SINT16" order="0"/></register>
+<register address="5" value="95" name="SP_MaxTemp"/>
+</holding_registers>
+<input_registers>
+<register address="0" value="0" name="IN_RPM"><binding automation="Auto_CentrifugeRPM" class="Binding_SINT16" order="0"/></register>
+<register address="1" value="0" name="IN_Vibration"><binding automation="Auto_CentrifugeVibration" class="Binding_SINT16" order="0"/></register>
+<register address="2" value="0" name="IN_BearingTemp"><binding automation="Auto_CentrifugeTemp" class="Binding_SINT16" order="0"/></register>
+</input_registers>
+<coils>
+<coil address="0" value="1" name="CMD_MotorEnable"/>
+<coil address="1" value="0" name="CMD_EmergencyStop"/>
+<coil address="2" value="0" name="ALM_HighVibration"/>
+<coil address="3" value="0" name="ALM_HighTemp"/>
+</coils>
+<input_coils>
+<coil address="0" value="1" name="STS_MachineReady"/>
+<coil address="1" value="0" name="STS_AlarmActive"/>
+</input_coils>
+<tuning>
+<reply_delay min="10" max="60" />
+<error_rates no_reply="0.0" />
+</tuning>
+</slave>
+
+<slave id="127.0.0.1(3)" enabled="true" name="DigestorPolpa" implementation="modbus">
+<holding_registers>
+<register address="0" value="0" name="PV_Temperature"><binding automation="Auto_DigesterTemp" class="Binding_SINT16" order="0"/></register>
+<register address="1" value="172" name="SP_Temperature"/>
+<register address="2" value="0" name="PV_Pressure"><binding automation="Auto_DigesterPressure" class="Binding_SINT16" order="0"/></register>
+<register address="3" value="8" name="SP_Pressure"/>
+<register address="4" value="0" name="PV_Level"><binding automation="Auto_DigesterLevel" class="Binding_SINT16" order="0"/></register>
+<register address="5" value="70" name="SP_Level"/>
+</holding_registers>
+<input_registers>
+<register address="0" value="0" name="IN_Temperature"><binding automation="Auto_DigesterTemp" class="Binding_SINT16" order="0"/></register>
+<register address="1" value="0" name="IN_Pressure"><binding automation="Auto_DigesterPressure" class="Binding_SINT16" order="0"/></register>
+<register address="2" value="0" name="IN_Level"><binding automation="Auto_DigesterLevel" class="Binding_SINT16" order="0"/></register>
+</input_registers>
+<coils>
+<coil address="0" value="1" name="CMD_FeedPumpEnable"/>
+<coil address="1" value="1" name="CMD_SteamValveEnable"/>
+<coil address="2" value="0" name="ALM_TempDeviation"/>
+<coil address="3" value="0" name="ALM_PressureDeviation"/>
+</coils>
+<input_coils>
+<coil address="0" value="1" name="STS_ProcessReady"/>
+<coil address="1" value="0" name="STS_AlarmActive"/>
+</input_coils>
+<tuning>
+<reply_delay min="15" max="75" />
+<error_rates no_reply="0.0" />
+</tuning>
+</slave>
+
+<master_tasks>
+<task name="Monitoramento geral da planta">
+<target name="Leitura Subestacao" list_text="127.0.0.1(1)">
+<address value="127.0.0.1(1)" />
+<request type="modbus" function="3" read_start="0" read_qty="7" write_start="0" write_qty="0" />
+<request type="modbus" function="2" read_start="0" read_qty="2" write_start="0" write_qty="0" />
+<request type="delay" delay_ms="1200" />
+</target>
+<target name="Leitura Centrifuga" list_text="127.0.0.1(2)">
+<address value="127.0.0.1(2)" />
+<request type="modbus" function="3" read_start="0" read_qty="6" write_start="0" write_qty="0" />
+<request type="modbus" function="2" read_start="0" read_qty="2" write_start="0" write_qty="0" />
+<request type="delay" delay_ms="1000" />
+</target>
+<target name="Leitura Digestor" list_text="127.0.0.1(3)">
+<address value="127.0.0.1(3)" />
+<request type="modbus" function="3" read_start="0" read_qty="6" write_start="0" write_qty="0" />
+<request type="modbus" function="2" read_start="0" read_qty="2" write_start="0" write_qty="0" />
+<request type="delay" delay_ms="1000" />
+</target>
+</task>
+<task name="Ajuste de setpoints turno B">
+<target name="Ajuste energia" list_text="127.0.0.1(1)">
+<address value="127.0.0.1(1)" />
+<request type="modbus" function="6" read_start="0" read_qty="0" write_start="6" write_qty="1" />
+<request type="delay" delay_ms="600" />
+</target>
+<target name="Ajuste centrifuga" list_text="127.0.0.1(2)">
+<address value="127.0.0.1(2)" />
+<request type="modbus" function="6" read_start="0" read_qty="0" write_start="1" write_qty="1" />
+<request type="delay" delay_ms="600" />
+</target>
+<target name="Ajuste digestor" list_text="127.0.0.1(3)">
+<address value="127.0.0.1(3)" />
+<request type="modbus" function="6" read_start="0" read_qty="0" write_start="5" write_qty="1" />
+<request type="delay" delay_ms="600" />
+</target>
+</task>
+</master_tasks>
+
+<startup>
+<script><abs>unused</abs>
+<rel>../Automations/Plant_ResetSetpoints.py</rel>
+</script>
+<script><abs>unused</abs>
+<rel>../Automations/Plant_StartAllAutomations.py</rel>
+</script>
+</startup>
+
+<ondemand>
+<script><abs>unused</abs>
+<rel>../Automations/Plant_EvaluateAlarms.py</rel>
+</script>
+<script><abs>unused</abs>
+<rel>../Automations/Plant_DemoShiftBump.py</rel>
+</script>
+<script><abs>unused</abs>
+<rel>../Automations/Plant_ResetSetpoints.py</rel>
+</script>
+</ondemand>
+</modbuspal_project>

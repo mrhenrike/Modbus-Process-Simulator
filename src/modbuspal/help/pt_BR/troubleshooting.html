@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Troubleshooting - pt-BR</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.55; }
+    h1, h2 { color: #1f3b4d; }
+    code { background: #f2f4f6; padding: 1px 4px; }
+  </style>
+</head>
+<body>
+  <h1>Troubleshooting (pt-BR)</h1>
+  <p><a href="index.html">Voltar ao índice</a></p>
+
+  <h2>Cannot bind port 502</h2>
+  <ul>
+    <li>Outra aplicação está usando a porta 502.</li>
+    <li>Troque a porta TCP ou finalize o processo concorrente.</li>
+  </ul>
+
+  <h2>Erro RXTX / serial indisponível</h2>
+  <ul>
+    <li>Ambientes Java modernos podem não expor <code>java.ext.dirs</code>.</li>
+    <li>Nesse caso, utilize TCP/IP ou Replay.</li>
+    <li>Use <b>Tools > Check dependencies</b> para validar rapidamente o estado.</li>
+  </ul>
+
+  <h2>Projeto não carregou corretamente</h2>
+  <ul>
+    <li>Valide se o XML <code>.xmpp</code> está íntegro e compatível.</li>
+    <li>Confira se scripts referenciados existem no caminho relativo esperado.</li>
+  </ul>
+</body>
+</html>

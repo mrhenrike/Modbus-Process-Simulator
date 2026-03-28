@@ -14,15 +14,25 @@ package modbuspal.main;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Image;
+import java.awt.event.ActionEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Locale;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.JRadioButtonMenuItem;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
+import javax.swing.ButtonGroup;
 import javax.swing.event.InternalFrameEvent;
 import javax.swing.event.InternalFrameListener;
 import javax.xml.parsers.ParserConfigurationException;
@@ -51,7 +61,7 @@ public class ModbusPalGui
      */
     public static void displayHelpMessage()
     {
-        System.out.println( "This software launches the Modbus Slave simulation program: ModbusSimulator." );
+        System.out.println( "This software launches " + ModbusPalPane.APP_STRING + " (process simulator)." );
         System.out.println( "Arguments in this program include:" );
         System.out.println(
                 "-install (optional): This flag is to tell program to install itself if it is not installed." );
@@ -156,6 +166,7 @@ public class ModbusPalGui
     */
     public static void main(String args[]) 
     {
+        prepareLegacySerialRuntime();
         boolean runInstall = false;
         boolean runGui = true;
         boolean showUI = true;
@@ -205,6 +216,7 @@ public class ModbusPalGui
             java.awt.EventQueue.invokeLater(new Runnable() {
                 @Override
                 public void run() {
+                    LanguageManager.initializeFromPreferences();
                     setNativeLookAndFeel();
                     newFrame().setVisible(true);
                 }
@@ -239,6 +251,19 @@ public class ModbusPalGui
     }
 
     /**
+     * RXTX legacy code expects java.ext.dirs to exist. Modern JDKs remove it.
+     * We provide an empty default to avoid NPE during RXTX bootstrap.
+     */
+    private static void prepareLegacySerialRuntime()
+    {
+        String extDirs = System.getProperty("java.ext.dirs");
+        if( extDirs == null )
+        {
+            System.setProperty("java.ext.dirs", "");
+        }
+    }
+
+    /**
      * A JinternalFrame that contains a ModbusPalPane.
      */
     public static class ModbusPalInternalFrame
@@ -256,9 +281,46 @@ public class ModbusPalGui
             setIconImage();
             setLayout( new BorderLayout() );
             modbusPal = new ModbusPalPane(false);
+            setJMenuBar(createMenuBar());
             add( modbusPal, BorderLayout.CENTER );
             pack();
+            modbusPal.refreshMainWindowTitle();
             addInternalFrameListener(this);
+        }
+
+        private JMenuBar createMenuBar()
+        {
+            JMenuBar bar = new JMenuBar();
+            JMenu exitMenu = new JMenu(LanguageManager.tr("menu.exit"));
+            JMenu helpMenu = new JMenu(LanguageManager.tr("menu.help"));
+            JMenu languageMenu = new JMenu(LanguageManager.tr("menu.language"));
+            JMenuItem exitItem = new JMenuItem(LanguageManager.tr("menu.exit"));
+            exitItem.addActionListener((ActionEvent e) -> doDefaultCloseAction());
+            JMenuItem helpItem = new JMenuItem(LanguageManager.tr("menu.help"));
+            helpItem.addActionListener((ActionEvent e) -> modbusPal.openHelpFromMenu());
+            exitMenu.add(exitItem);
+            helpMenu.add(helpItem);
+            bar.add(exitMenu);
+            bar.add(helpMenu);
+            bar.add(languageMenu);
+            ButtonGroup bg = new ButtonGroup();
+            JRadioButtonMenuItem pt = new JRadioButtonMenuItem(LanguageManager.tr("menu.language.pt_br"));
+            JRadioButtonMenuItem en = new JRadioButtonMenuItem(LanguageManager.tr("menu.language.en_us"));
+            JRadioButtonMenuItem es = new JRadioButtonMenuItem(LanguageManager.tr("menu.language.es_es"));
+            bg.add(pt);
+            bg.add(en);
+            bg.add(es);
+            languageMenu.add(pt);
+            languageMenu.add(en);
+            languageMenu.add(es);
+            Locale current = modbusPal.getCurrentLocale();
+            pt.setSelected(current.toLanguageTag().equalsIgnoreCase("pt-BR"));
+            en.setSelected(current.toLanguageTag().equalsIgnoreCase("en-US"));
+            es.setSelected(current.toLanguageTag().equalsIgnoreCase("es-ES"));
+            pt.addActionListener((ActionEvent e) -> { modbusPal.setLanguageAndRefresh(LanguageManager.LOCALE_PT_BR); setJMenuBar(createMenuBar()); });
+            en.addActionListener((ActionEvent e) -> { modbusPal.setLanguageAndRefresh(LanguageManager.LOCALE_EN_US); setJMenuBar(createMenuBar()); });
+            es.addActionListener((ActionEvent e) -> { modbusPal.setLanguageAndRefresh(LanguageManager.LOCALE_ES_ES); setJMenuBar(createMenuBar()); });
+            return bar;
         }
 
         private void setIconImage()
@@ -274,7 +336,7 @@ public class ModbusPalGui
 
         @Override
         public void internalFrameClosing(InternalFrameEvent e) {
-            modbusPal.exit();
+            modbusPal.shutdownApplication();
         }
 
         @Override
@@ -316,8 +378,107 @@ public class ModbusPalGui
             setIconImage();
             setLayout( new BorderLayout() );
             modbusPal = new ModbusPalPane(true);
+            setJMenuBar(createMenuBar());
             add( modbusPal, BorderLayout.CENTER );
+            modbusPal.refreshMainWindowTitle();
+            addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowClosing(WindowEvent e) {
+                    modbusPal.shutdownApplication();
+                }
+            });
             pack();
+        }
+
+        private JMenuBar createMenuBar()
+        {
+            JMenuBar bar = new JMenuBar();
+
+            JMenu exitMenu = new JMenu(LanguageManager.tr("menu.exit"));
+            JMenu projectMenu = new JMenu(LanguageManager.tr("menu.project"));
+            JMenu toolsMenu = new JMenu(LanguageManager.tr("menu.tools"));
+            JMenu helpMenu = new JMenu(LanguageManager.tr("menu.help"));
+            JMenu languageMenu = new JMenu(LanguageManager.tr("menu.language"));
+            JMenu aboutMenu = new JMenu(LanguageManager.tr("menu.about"));
+
+            JMenuItem exitItem = new JMenuItem(LanguageManager.tr("menu.exit"));
+            exitItem.addActionListener((ActionEvent e) -> modbusPal.shutdownApplication());
+            exitMenu.add(exitItem);
+
+            JMenuItem loadItem = new JMenuItem(LanguageManager.tr("menu.project.load"));
+            loadItem.addActionListener((ActionEvent e) -> modbusPal.openProjectFromMenu());
+            JMenuItem saveItem = new JMenuItem(LanguageManager.tr("menu.project.save"));
+            saveItem.addActionListener((ActionEvent e) -> modbusPal.saveProjectFromMenu());
+            JMenuItem saveAsItem = new JMenuItem(LanguageManager.tr("menu.project.save_as"));
+            saveAsItem.addActionListener((ActionEvent e) -> modbusPal.saveProjectAsFromMenu());
+            JMenuItem clearItem = new JMenuItem(LanguageManager.tr("menu.project.clear"));
+            clearItem.addActionListener((ActionEvent e) -> modbusPal.clearProjectFromMenu());
+            projectMenu.add(loadItem);
+            projectMenu.add(saveItem);
+            projectMenu.add(saveAsItem);
+            projectMenu.add(clearItem);
+
+            JMenuItem masterItem = new JMenuItem(LanguageManager.tr("menu.tools.master"));
+            masterItem.addActionListener((ActionEvent e) -> modbusPal.toggleMasterFromMenu());
+            JMenuItem scriptsItem = new JMenuItem(LanguageManager.tr("menu.tools.scripts"));
+            scriptsItem.addActionListener((ActionEvent e) -> modbusPal.toggleScriptsFromMenu());
+            JMenuItem consoleItem = new JMenuItem(LanguageManager.tr("menu.tools.console"));
+            consoleItem.addActionListener((ActionEvent e) -> modbusPal.toggleConsoleFromMenu());
+            JMenuItem dependencyItem = new JMenuItem(LanguageManager.tr("menu.tools.dependencies"));
+            dependencyItem.addActionListener((ActionEvent e) -> modbusPal.openDependencyCheckFromMenu());
+            toolsMenu.add(masterItem);
+            toolsMenu.add(scriptsItem);
+            toolsMenu.add(consoleItem);
+            toolsMenu.add(dependencyItem);
+
+            JMenuItem helpItem = new JMenuItem(LanguageManager.tr("menu.help"));
+            helpItem.addActionListener((ActionEvent e) -> modbusPal.openHelpFromMenu());
+            helpMenu.add(helpItem);
+
+            ButtonGroup group = new ButtonGroup();
+            JRadioButtonMenuItem ptItem = new JRadioButtonMenuItem(LanguageManager.tr("menu.language.pt_br"));
+            JRadioButtonMenuItem enItem = new JRadioButtonMenuItem(LanguageManager.tr("menu.language.en_us"));
+            JRadioButtonMenuItem esItem = new JRadioButtonMenuItem(LanguageManager.tr("menu.language.es_es"));
+            group.add(ptItem);
+            group.add(enItem);
+            group.add(esItem);
+            languageMenu.add(ptItem);
+            languageMenu.add(enItem);
+            languageMenu.add(esItem);
+
+            Locale current = modbusPal.getCurrentLocale();
+            ptItem.setSelected(current.toLanguageTag().equalsIgnoreCase("pt-BR"));
+            enItem.setSelected(current.toLanguageTag().equalsIgnoreCase("en-US"));
+            esItem.setSelected(current.toLanguageTag().equalsIgnoreCase("es-ES"));
+
+            ptItem.addActionListener((ActionEvent e) -> {
+                modbusPal.setLanguageAndRefresh(LanguageManager.LOCALE_PT_BR);
+                setJMenuBar(createMenuBar());
+            });
+            enItem.addActionListener((ActionEvent e) -> {
+                modbusPal.setLanguageAndRefresh(LanguageManager.LOCALE_EN_US);
+                setJMenuBar(createMenuBar());
+            });
+            esItem.addActionListener((ActionEvent e) -> {
+                modbusPal.setLanguageAndRefresh(LanguageManager.LOCALE_ES_ES);
+                setJMenuBar(createMenuBar());
+            });
+
+            JMenuItem aboutItem = new JMenuItem(LanguageManager.tr("menu.about.title"));
+            aboutItem.addActionListener((ActionEvent e) -> JOptionPane.showMessageDialog(
+                    this,
+                    LanguageManager.tr("menu.about.message", ModbusPalPane.APP_VERSION),
+                    LanguageManager.tr("menu.about.title"),
+                    JOptionPane.INFORMATION_MESSAGE));
+            aboutMenu.add(aboutItem);
+
+            bar.add(exitMenu);
+            bar.add(projectMenu);
+            bar.add(toolsMenu);
+            bar.add(helpMenu);
+            bar.add(languageMenu);
+            bar.add(aboutMenu);
+            return bar;
         }
 
         private void setIconImage()

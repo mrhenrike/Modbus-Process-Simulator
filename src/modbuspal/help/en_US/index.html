@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8">
+  <title>Operational Guide - Modbus Process Plant Simulator</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.5; }
+    h1, h2 { color: #1f3b4d; }
+    code { background: #f2f4f6; padding: 1px 4px; }
+    .note { border-left: 4px solid #2b7; padding: 8px 12px; background: #f5fffa; }
+    .warn { border-left: 4px solid #d68a00; padding: 8px 12px; background: #fff9ed; }
+    .nav a { margin-right: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Modbus Process Plant Simulator - Operational Guide</h1>
+  <p>Main guide for plant-process simulation and MODBUS training workflows.</p>
+
+  <div class="nav">
+    <a href="workflow.html">Step-by-step workflow</a>
+    <a href="troubleshooting.html">Troubleshooting</a>
+  </div>
+
+  <h2>1) Interface structure</h2>
+  <ul>
+    <li><b>Project menu</b>: load/save/clear project.</li>
+    <li><b>Tools menu</b>: Master, Scripts, Console, Check dependencies.</li>
+    <li><b>Help menu</b>: contextual documentation and operational guides.</li>
+    <li><b>Language menu</b>: live UI language switch.</li>
+    <li><b>Exit menu</b>: closes app with workspace persistence.</li>
+    <li><b>Connection panel</b>: Link settings + Run/Learn/Record.</li>
+  </ul>
+
+  <h2>2) Runtime controls</h2>
+  <ul>
+    <li><b>Run</b>: starts/stops selected link (TCP/IP, Serial, Replay).</li>
+    <li><b>Learn</b>: auto-creates points on unknown master writes.</li>
+    <li><b>Record</b>: records MODBUS traffic for replay and audit.</li>
+    <li><b>ASCII</b>: enables MODBUS ASCII framing over serial.</li>
+  </ul>
+
+  <h2>3) Process and MODBUS concepts</h2>
+  <ul>
+    <li><b>Holding Registers</b>: setpoints and commands (R/W).</li>
+    <li><b>Input Registers</b>: process telemetry (R).</li>
+    <li><b>Coils</b>: boolean commands (R/W).</li>
+    <li><b>Input Coils</b>: status/alarm bits (R).</li>
+    <li><b>Bindings</b>: data-type conversion (SINT16, FLOAT32, etc.).</li>
+    <li><b>Functions</b>: custom per-slave logic.</li>
+  </ul>
+
+  <div class="note">
+    <b>Port 502:</b> standard MODBUS/TCP endpoint. Bind errors indicate the port is already occupied.
+  </div>
+  <div class="warn">
+    <b>Serial on modern JDK:</b> RXTX may be limited on non-legacy runtimes; use TCP/IP or Replay when needed.
+  </div>
+
+  <h2>4) Screenshot references</h2>
+  <p>Reference screenshots for this phase are located in <code>Docs/</code>:</p>
+  <ul>
+    <li><code>screenshot_modbuspalframe.jpg</code></li>
+    <li><code>screenshot_automationeditor.jpg</code></li>
+    <li><code>screenshot_slaveeditor.jpg</code></li>
+  </ul>
+</body>
+</html>

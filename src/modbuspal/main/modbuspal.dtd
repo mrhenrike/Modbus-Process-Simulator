@@ -12,7 +12,7 @@ and open the template in the editor.
 
 <!-- TODO define your own vocabulary/syntax. Example follows:  -->
 
-<!ELEMENT modbuspal_project (idgen,links,generators?,bindings?,automation*,slave*,startup?,ondemand?)>
+<!ELEMENT modbuspal_project (idgen,links,generators?,bindings?,automation*,slave*,master_tasks?,startup?,ondemand?)>
 <!ELEMENT modbuspal_slave (slave*,automation*)>
 <!ELEMENT modbuspal_automation (automation*)>
 
@@ -78,6 +78,27 @@ and open the template in the editor.
 <!ELEMENT startup (script*)>
 
 <!ELEMENT ondemand (script*)>
+
+<!ELEMENT master_tasks (task*)>
+
+<!ELEMENT task (target*)>
+<!ATTLIST task name CDATA #IMPLIED>
+
+<!ELEMENT target (address*,request*)>
+<!ATTLIST target name CDATA #IMPLIED>
+<!ATTLIST target list_text CDATA #IMPLIED>
+
+<!ELEMENT address EMPTY>
+<!ATTLIST address value CDATA #REQUIRED>
+
+<!ELEMENT request EMPTY>
+<!ATTLIST request type (modbus|delay) "modbus">
+<!ATTLIST request function CDATA #IMPLIED>
+<!ATTLIST request read_start CDATA #IMPLIED>
+<!ATTLIST request read_qty CDATA #IMPLIED>
+<!ATTLIST request write_start CDATA #IMPLIED>
+<!ATTLIST request write_qty CDATA #IMPLIED>
+<!ATTLIST request delay_ms CDATA #IMPLIED>
 
 <!ELEMENT script (abs,rel?)>
 

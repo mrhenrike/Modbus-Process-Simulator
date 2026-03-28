@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8">
+  <title>Troubleshooting - en-US</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.55; }
+    h1, h2 { color: #1f3b4d; }
+    code { background: #f2f4f6; padding: 1px 4px; }
+  </style>
+</head>
+<body>
+  <h1>Troubleshooting (en-US)</h1>
+  <p><a href="index.html">Back to index</a></p>
+
+  <h2>Cannot bind port 502</h2>
+  <ul>
+    <li>Another process is already bound to port 502.</li>
+    <li>Change TCP port or stop the conflicting process.</li>
+  </ul>
+
+  <h2>RXTX / serial unavailable</h2>
+  <ul>
+    <li>Modern Java runtimes may not expose <code>java.ext.dirs</code>.</li>
+    <li>When serial is unavailable, use TCP/IP or Replay mode.</li>
+    <li>Use <b>Tools > Check dependencies</b> for quick diagnostics.</li>
+  </ul>
+
+  <h2>Project load issues</h2>
+  <ul>
+    <li>Validate <code>.xmpp</code> integrity and compatibility.</li>
+    <li>Confirm all referenced scripts exist in expected relative paths.</li>
+  </ul>
+</body>
+</html>

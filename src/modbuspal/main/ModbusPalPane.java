@@ -12,21 +12,30 @@
 package modbuspal.main;
 
 import java.awt.CardLayout;
+import java.awt.Color;
+import java.awt.Font;
 import javax.xml.parsers.ParserConfigurationException;
 import modbuspal.automation.AutomationPanel;
 import modbuspal.toolkit.NumericTextField;
 import modbuspal.slave.ModbusSlavePanel;
 import java.awt.Component;
+import java.awt.Frame;
+import java.awt.Window;
 import java.awt.Dialog.ModalExclusionType;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JInternalFrame;
 import javax.swing.JPanel;
+import javax.swing.AbstractButton;
+import javax.swing.border.TitledBorder;
+import javax.swing.SwingUtilities;
 import modbuspal.automation.Automation;
 import modbuspal.help.HelpViewer;
 import modbuspal.link.*;
@@ -48,14 +57,24 @@ public class ModbusPalPane
 extends JPanel
 implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
 {
-    /** Name and version of this application */
-    public static final String APP_STRING = "ModbusPal v1.7 by @mrhenrike";
+    /** Product name shown in the window title and about/help context. */
+    public static final String APP_NAME = "Modbus Process Simulator";
+
+    /** Semantic version (release.fix). */
+    public static final String APP_VERSION = "1.9.0";
+
+    /** Short branding string for menus and dialogs. */
+    public static final String APP_STRING = APP_NAME + " v" + APP_VERSION;
     
     /** Base registry key for the configuration of the application. */
     public static final String BASE_REGISTRY_KEY = "modbuspal";
     
     /** Default TCP/IP port in a string to be loaded into the GUI. */
     public static final String DEFAULT_PORT_TEXT = "502";
+
+    private static final String LINK_KEY_TCPIP = "tcpip";
+    private static final String LINK_KEY_SERIAL = "serial";
+    private static final String LINK_KEY_REPLAY = "replay";
 
     private ArrayList<ModbusPalProjectListener> listeners = new ArrayList<ModbusPalProjectListener>();
         
@@ -65,6 +84,9 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
     private AppConsole console = null;
     ModbusPalProject modbusPalProject;
     private HelpViewer helpViewer = null;
+    private DependencyCheckDialog dependencyCheckDialog = null;
+    private boolean serialAsciiModeEnabled = false;
+    private volatile boolean shutdownInProgress = false;
 
     /**
      * Adds a ModbusPalProjectListener listener to the list of listeners.
@@ -123,12 +145,7 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
         // Refresh GUI
         //- - - - - - - - - - - - - -
 
-        // Select the link tab:
-        for( int i=0; i<linksTabbedPane.getComponentCount(); i++ ) {
-            if( linksTabbedPane.getTitleAt(i).compareTo( project.selectedLink )==0 ) {
-                linksTabbedPane.setSelectedIndex(i);
-            }
-        }
+        selectLinkTabByKey(project.selectedLink);
 
         // Init tcp/ip settings
         portTextField.setText( project.linkTcpipPort );
@@ -179,6 +196,7 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
         if( modbusMasterDialog!=null)
         {
             modbusMasterDialog.setProject(modbusPalProject);
+            modbusMasterDialog.refreshLocalization();
         }
         
         System.out.printf("[%s] Project set\r\n", modbusPalProject.getName());
@@ -191,6 +209,7 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
 
         validate();
         repaint();
+        refreshMainWindowTitle();
     }
 
 
@@ -216,8 +235,7 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
         System.out.printf("[%s] Save project\r\n", modbusPalProject.getName());
 
         // update selected link tab:
-        int index = linksTabbedPane.getSelectedIndex();
-        modbusPalProject.selectedLink = linksTabbedPane.getTitleAt(index);
+        modbusPalProject.selectedLink = getSelectedLinkKey();
 
         // update tcp/ip settings
         modbusPalProject.linkTcpipPort = portTextField.getText();
@@ -236,6 +254,50 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
         modbusPalProject.save(projectFile);
     }
 
+    private String getSelectedLinkKey()
+    {
+        Component selected = linksTabbedPane.getSelectedComponent();
+        if( selected == tcpIpSettingsPanel )
+        {
+            return LINK_KEY_TCPIP;
+        }
+        if( selected == jPanel1 )
+        {
+            return LINK_KEY_SERIAL;
+        }
+        if( selected == replaySettingsPanel )
+        {
+            return LINK_KEY_REPLAY;
+        }
+        return LINK_KEY_TCPIP;
+    }
+
+    private void selectLinkTabByKey(String selectedLink)
+    {
+        if( selectedLink == null )
+        {
+            linksTabbedPane.setSelectedComponent(tcpIpSettingsPanel);
+            return;
+        }
+        String normalized = selectedLink.trim().toLowerCase(Locale.ROOT);
+        if( normalized.equals(LINK_KEY_SERIAL) || normalized.equals("serial") )
+        {
+            linksTabbedPane.setSelectedComponent(jPanel1);
+            return;
+        }
+        if( normalized.equals(LINK_KEY_REPLAY) || normalized.equals("replay") )
+        {
+            linksTabbedPane.setSelectedComponent(replaySettingsPanel);
+            return;
+        }
+        if( normalized.equals(LINK_KEY_TCPIP) || normalized.equals("tcp/ip") || normalized.equals("tcpip") )
+        {
+            linksTabbedPane.setSelectedComponent(tcpIpSettingsPanel);
+            return;
+        }
+        linksTabbedPane.setSelectedComponent(tcpIpSettingsPanel);
+    }
+
 
 
     private void setReplayFile(File src)
@@ -247,9 +309,162 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
         }
         else
         {
-            chosenRecordFileTextField.setText(null);
+            chosenRecordFileTextField.setText(LanguageManager.tr("pane.link.no_file"));
             chosenRecordFileTextField.putClientProperty("record file", null);
         }
+    }
+
+    private void setTitledBorderTitle(JPanel panel, String title)
+    {
+        if( panel.getBorder() instanceof TitledBorder )
+        {
+            TitledBorder border = (TitledBorder) panel.getBorder();
+            border.setTitle(title);
+            panel.repaint();
+        }
+    }
+
+    private void applyLocalization()
+    {
+        setTitledBorderTitle(linkPanel, LanguageManager.tr("pane.group.link_settings"));
+        linksTabbedPane.setTitleAt(0, LanguageManager.tr("pane.link.tcpip"));
+        linksTabbedPane.setTitleAt(1, LanguageManager.tr("pane.link.serial"));
+        linksTabbedPane.setTitleAt(2, LanguageManager.tr("pane.link.replay"));
+        jLabel1.setText(LanguageManager.tr("pane.link.tcp_port"));
+        jLabel2.setText(LanguageManager.tr("pane.link.record_file"));
+        jLabel3.setText(LanguageManager.tr("pane.link.serial_disabled"));
+        jButton1.setText(LanguageManager.tr("pane.link.why"));
+        recordFileChooseButton.setText(LanguageManager.tr("pane.link.choose"));
+        if( chosenRecordFileTextField.getClientProperty("record file") == null )
+        {
+            chosenRecordFileTextField.setText(LanguageManager.tr("pane.link.no_file"));
+        }
+
+        runToggleButton.setText(LanguageManager.tr("pane.run"));
+        learnToggleButton.setText(LanguageManager.tr("pane.learn"));
+        recordToggleButton.setText(LanguageManager.tr("pane.record"));
+        asciiToggleButton.setText(LanguageManager.tr("pane.ascii"));
+        asciiToggleButton.setToolTipText(serialAsciiModeEnabled
+                ? LanguageManager.tr("pane.ascii.enabled_tooltip")
+                : LanguageManager.tr("pane.ascii.disabled_tooltip"));
+
+        setTitledBorderTitle(projectPanel, LanguageManager.tr("pane.group.project"));
+        loadButton.setText(LanguageManager.tr("pane.project.load"));
+        saveProjectButton.setText(LanguageManager.tr("pane.project.save"));
+        clearProjectButton.setText(LanguageManager.tr("pane.project.clear"));
+        saveProjectAsButton.setText(LanguageManager.tr("pane.project.save_as"));
+
+        setTitledBorderTitle(toolsPanel, LanguageManager.tr("pane.group.tools"));
+        masterToggleButton.setText(LanguageManager.tr("pane.tools.master"));
+        scriptsToggleButton.setText(LanguageManager.tr("pane.tools.scripts"));
+        helpButton.setText(LanguageManager.tr("pane.tools.help"));
+        consoleToggleButton.setText(LanguageManager.tr("pane.tools.console"));
+
+        setTitledBorderTitle(slavesListView, LanguageManager.tr("pane.group.slaves"));
+        addModbusSlaveButton.setText(LanguageManager.tr("pane.slaves.add"));
+        enableAllSlavesButton.setText(LanguageManager.tr("pane.slaves.enable_all"));
+        disableAllSlavesButton.setText(LanguageManager.tr("pane.slaves.disable_all"));
+
+        setTitledBorderTitle(jPanel3, LanguageManager.tr("pane.group.automation"));
+        addAutomationButton.setText(LanguageManager.tr("pane.automation.add"));
+        startAllAutomationsButton.setText(LanguageManager.tr("pane.automation.start_all"));
+        stopAllAutomationsButton.setText(LanguageManager.tr("pane.automation.stop_all"));
+
+        int parityIndex = parityComboBox.getSelectedIndex();
+        parityComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] {
+            LanguageManager.tr("pane.serial.parity.none"),
+            LanguageManager.tr("pane.serial.parity.odd"),
+            LanguageManager.tr("pane.serial.parity.even")
+        }));
+        if( parityIndex >= 0 && parityIndex < parityComboBox.getItemCount() ) {
+            parityComboBox.setSelectedIndex(parityIndex);
+        }
+
+        int stopBitsIndex = stopBitsComboBox.getSelectedIndex();
+        stopBitsComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] {
+            LanguageManager.tr("pane.serial.stopbits.1"),
+            LanguageManager.tr("pane.serial.stopbits.1_5"),
+            LanguageManager.tr("pane.serial.stopbits.2")
+        }));
+        if( stopBitsIndex >= 0 && stopBitsIndex < stopBitsComboBox.getItemCount() ) {
+            stopBitsComboBox.setSelectedIndex(stopBitsIndex);
+        }
+        refreshMainWindowTitle();
+    }
+
+    private void configureAsciiToggle()
+    {
+        asciiToggleButton.setEnabled(true);
+        asciiToggleButton.addActionListener(new java.awt.event.ActionListener() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent evt)
+            {
+                serialAsciiModeEnabled = asciiToggleButton.isSelected();
+                asciiToggleButton.setToolTipText(serialAsciiModeEnabled
+                        ? LanguageManager.tr("pane.ascii.enabled_tooltip")
+                        : LanguageManager.tr("pane.ascii.disabled_tooltip"));
+            }
+        });
+    }
+
+    private void installVisualStyle()
+    {
+        Color panelBg = new Color(24, 28, 36);
+        Color cardBg = new Color(33, 38, 48);
+        Color text = new Color(230, 236, 244);
+        Color runColor = new Color(78, 197, 112);
+        Color actionColor = new Color(72, 131, 255);
+        Color asciiColor = new Color(126, 91, 217);
+
+        settingsPanel.setBackground(panelBg);
+        linkPanel.setBackground(cardBg);
+        runPanel.setBackground(cardBg);
+        tcpIpSettingsPanel.setBackground(cardBg);
+        replaySettingsPanel.setBackground(cardBg);
+        serialSettingsPanel.setBackground(cardBg);
+        jPanel5.setBackground(cardBg);
+
+        jLabel1.setForeground(text);
+        jLabel2.setForeground(text);
+        jLabel3.setForeground(text);
+
+        styleActionButton(runToggleButton, runColor, text);
+        styleActionButton(learnToggleButton, actionColor, text);
+        styleActionButton(recordToggleButton, actionColor, text);
+        styleActionButton(asciiToggleButton, asciiColor, text);
+    }
+
+    private void styleActionButton(AbstractButton button, Color bg, Color fg)
+    {
+        button.setFont(button.getFont().deriveFont(Font.BOLD, 13f));
+        button.setBackground(bg);
+        button.setForeground(fg);
+        button.setOpaque(true);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+    }
+
+    public void setLanguageAndRefresh(Locale locale)
+    {
+        LanguageManager.setLocale(locale);
+        applyLocalization();
+        if( helpViewer != null )
+        {
+            helpViewer.reloadLocalizedIndex();
+        }
+        if( scriptManagerDialog != null )
+        {
+            scriptManagerDialog.refreshLocalization();
+        }
+        if( modbusMasterDialog != null )
+        {
+            modbusMasterDialog.refreshLocalization();
+        }
+    }
+
+    public Locale getCurrentLocale()
+    {
+        return LanguageManager.getLocale();
     }
 
 
@@ -272,7 +487,12 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
     /** Creates new form ModbusPalPane */
     public ModbusPalPane(boolean useInternalConsole)
     {
+        LanguageManager.initializeFromPreferences();
         initComponents();
+        configureMenuDrivenLayout();
+        configureAsciiToggle();
+        applyLocalization();
+        installVisualStyle();
 
         if(useInternalConsole)
         {
@@ -285,43 +505,40 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
         }
 
         installRecorder();
-        //installCommPorts();
+        installCommPorts();
         installScriptEngine();
         
-        String initialLoadProjectFilePath = ModbusPalGui.getInitialLoadFilePath();
+        String pathToLoad = ModbusPalGui.getInitialLoadFilePath();
+        if( pathToLoad == null || pathToLoad.isEmpty() )
+        {
+            String lastPath = WorkspacePreferences.getLastProjectPath();
+            if( lastPath != null )
+            {
+                File lastFile = new File( lastPath );
+                if( lastFile.isFile() )
+                {
+                    pathToLoad = lastPath;
+                }
+            }
+        }
+
         ModbusPalProject project = null;
-        File fileCheck = new File( initialLoadProjectFilePath );
-        if( initialLoadProjectFilePath != "" && fileCheck.isFile() )
+        File fileCheck = new File( pathToLoad != null ? pathToLoad : "" );
+        boolean haveProjectFile = pathToLoad != null && pathToLoad.isEmpty() == false && fileCheck.isFile();
+        if( haveProjectFile )
         {
             try
             {
-                System.out.println( "Loading the project file: " + initialLoadProjectFilePath );
-                project = loadProject( initialLoadProjectFilePath );
-
-                // Need to initialize the port number after loading the project, and not every time we load or set a project because if the
-                // user wants to load another file, we don't want to clobber it with the command line initial port number.
-                // This call must be called before the runToggleButton.doClick() method is invoked.
-                initializeInitialPortNumber( project );
-                
-                // Now that we have loaded a project from an initial project file, it is time to start all of the
-                // automations that have been loaded from the project file.
-                Component panels[] = automationsListPanel.getComponents();
-                for( int panelIndex = 0; panelIndex < panels.length; panelIndex++ )
-                {
-                    if( panels[ panelIndex ] instanceof AutomationPanel )
-                    {
-                        AutomationPanel panel = ( AutomationPanel ) panels[ panelIndex ];
-                        panel.automationHasStarted( null );
-                    }
-                }
-                runToggleButton.doClick();
-                learnToggleButton.doClick();
+                System.out.println( "Loading the project file: " + pathToLoad );
+                project = loadProject( pathToLoad );
+                WorkspacePreferences.setLastProjectPath( fileCheck );
+                startLoadedProjectSession( project );
             }
             catch( Exception exception )
             {
                 System.out.println(
-                        "Could not load the initial project file path \"" + initialLoadProjectFilePath + "\"." );
-                System.out.println( "Check the path you inputted into the command line arguments." );
+                        "Could not load the project file \"" + pathToLoad + "\"." );
+                System.out.println( "Check the path or use File > Load to choose another .xmpp project." );
             }
         }
         else 
@@ -332,6 +549,102 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
         	// command line arguments.
         	initializeInitialPortNumber( project );
         } 
+    }
+
+    private void configureMenuDrivenLayout()
+    {
+        settingsPanel.remove(projectPanel);
+        settingsPanel.remove(toolsPanel);
+        projectPanel.setVisible(false);
+        toolsPanel.setVisible(false);
+        settingsPanel.revalidate();
+        settingsPanel.repaint();
+    }
+
+    /**
+     * Após carregar um ficheiro .xmpp (linha de comando, última sessão ou futuras extensões),
+     * aplica a mesma sequência de arranque que o utilizador espera num laboratório: porta inicial,
+     * notificação das automações e arranque do link/simulação.
+     *
+     * @param project projeto já associado ao painel via {@link #loadProject(String)}
+     */
+    private void startLoadedProjectSession( ModbusPalProject project )
+    {
+        initializeInitialPortNumber( project );
+
+        Component panels[] = automationsListPanel.getComponents();
+        for( int panelIndex = 0; panelIndex < panels.length; panelIndex++ )
+        {
+            if( panels[ panelIndex ] instanceof AutomationPanel )
+            {
+                AutomationPanel panel = (AutomationPanel) panels[ panelIndex ];
+                panel.automationHasStarted( null );
+            }
+        }
+        runToggleButton.doClick();
+        learnToggleButton.doClick();
+    }
+
+    /**
+     * Grava nas preferências o ficheiro de projeto atual antes de fechar a janela.
+     */
+    public void persistWorkspaceBeforeExit()
+    {
+        if( modbusPalProject != null && modbusPalProject.projectFile != null )
+        {
+            WorkspacePreferences.setLastProjectPath( modbusPalProject.projectFile );
+        }
+    }
+
+    /**
+     * Builds the text for the host window (frame or internal frame).
+     *
+     * @return title including project file name when available
+     */
+    public String buildWindowTitle()
+    {
+        if( modbusPalProject == null )
+        {
+            return APP_STRING;
+        }
+        if( modbusPalProject.projectFile != null )
+        {
+            return APP_STRING + " \u2014 " + modbusPalProject.projectFile.getName();
+        }
+        return APP_STRING + " \u2014 " + LanguageManager.tr("status.no_saved_project");
+    }
+
+    /**
+     * Updates {@link JFrame} or {@link JInternalFrame} title from the EDT.
+     */
+    public void refreshMainWindowTitle()
+    {
+        Runnable updater = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                String title = buildWindowTitle();
+                Window w = SwingUtilities.getWindowAncestor( ModbusPalPane.this );
+                if( w instanceof JFrame )
+                {
+                    ( (JFrame) w ).setTitle( title );
+                }
+                JInternalFrame jif = (JInternalFrame) SwingUtilities.getAncestorOfClass( JInternalFrame.class, ModbusPalPane.this );
+                if( jif != null )
+                {
+                    jif.setTitle( title );
+                }
+            }
+        };
+        if( SwingUtilities.isEventDispatchThread() )
+        {
+            updater.run();
+        }
+        else
+        {
+            SwingUtilities.invokeLater( updater );
+        }
     }
 
     /**
@@ -366,14 +679,13 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
      */
     public static boolean verifyRXTX()
     {
-        // try to load the CommPortVerifier class
         ClassLoader cl = ClassLoader.getSystemClassLoader();
         try
         {
-            Class c = cl.loadClass("gnu.io.CommPortIdentifier");
+            Class.forName("gnu.io.CommPortIdentifier", false, cl);
             return true;
         }
-        catch (Exception ex)
+        catch (Throwable ex)
         {
             return false;
         }
@@ -447,13 +759,20 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
             layout.show(jPanel1, "disabled");
             return;
         }        
-        
-        // detect the comm ports
+
+        // detect the comm ports (non-fatal if none were found)
         ModbusSerialLink.enumerate();
-        
+
+        CardLayout layout = (CardLayout)jPanel1.getLayout();
+        layout.show(jPanel1, "enabled");
+
         // get the list of comm ports (as strings)
         // and put it in the swing list
         comPortComboBox.setModel( ModbusSerialLink.getListOfCommPorts() );
+        if( comPortComboBox.getItemCount() > 0 )
+        {
+            comPortComboBox.setSelectedIndex(0);
+        }
     }
     
    
@@ -962,6 +1281,16 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
 
     private void startSerialLink(boolean isMaster)
     {
+        if( comPortComboBox.getItemCount() <= 0 )
+        {
+            runToggleButton.doClick();
+            ErrorMessage dialog = new ErrorMessage("Close");
+            dialog.setTitle(LanguageManager.tr("error.serial.title"));
+            dialog.append(LanguageManager.tr("error.serial.no_ports"));
+            dialog.setVisible(true);
+            return;
+        }
+
         //- - - - - - - - - - - -
         // GET BAUDRATE
         //- - - - - - - - - - - -
@@ -1008,7 +1337,11 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
         try
         {
             int commPortIndex = comPortComboBox.getSelectedIndex();
-            currentLink = new ModbusSerialLink(modbusPalProject, commPortIndex, baudrate, parity, stopBits, xonxoff, rtscts);
+            if( commPortIndex < 0 )
+            {
+                throw new IllegalStateException(LanguageManager.tr("error.serial.invalid_port"));
+            }
+            currentLink = new ModbusSerialLink(modbusPalProject, commPortIndex, baudrate, parity, stopBits, xonxoff, rtscts, serialAsciiModeEnabled);
             
             if(isMaster)
             {
@@ -1026,10 +1359,10 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
             ex.printStackTrace();
             runToggleButton.doClick();
             ErrorMessage dialog = new ErrorMessage("Close");
-            dialog.setTitle("TCP/IP error");
-            dialog.append("Cannot bind port " + portTextField.getText() + "\r\n");
-            dialog.append("The following exception occured:" + ex.getClass().getSimpleName() + "\r\n");
-            dialog.append("Message:"+ex.getLocalizedMessage());
+            dialog.setTitle(LanguageManager.tr("error.serial.title"));
+            dialog.append(LanguageManager.tr("error.serial.bind",
+                    ex.getClass().getSimpleName(),
+                    ex.getLocalizedMessage()));
             dialog.setVisible(true);
             return;
         }
@@ -1050,8 +1383,8 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
         {
             runToggleButton.doClick();
             ErrorMessage dialog = new ErrorMessage("Close");
-            dialog.setTitle("TCP Port error");
-            dialog.append("The TCP port number must be a value between 0 and 65535. The default value is 502.");
+            dialog.setTitle(LanguageManager.tr("error.tcp.title"));
+            dialog.append(LanguageManager.tr("error.tcp.port_number"));
             dialog.setVisible(true);
             return;
         }
@@ -1077,10 +1410,11 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
             ex.printStackTrace();
             runToggleButton.doClick();
             ErrorMessage dialog = new ErrorMessage("Close");
-            dialog.setTitle("TCP/IP error");
-            dialog.append("Cannot bind port " + portTextField.getText() + "\r\n");
-            dialog.append("The following exception occured:" + ex.getClass().getSimpleName() + "\r\n");
-            dialog.append("Message:"+ex.getLocalizedMessage());
+            dialog.setTitle(LanguageManager.tr("error.tcp.title"));
+            dialog.append(LanguageManager.tr("error.tcp.bind",
+                    portTextField.getText(),
+                    ex.getClass().getSimpleName(),
+                    ex.getLocalizedMessage()));
             dialog.setVisible(true);
             return;
         }
@@ -1116,9 +1450,10 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
             ex.printStackTrace();
             runToggleButton.doClick();
             ErrorMessage dialog = new ErrorMessage("Close");
-            dialog.setTitle("Replay error");
-            dialog.append("The following exception occured:" + ex.getClass().getSimpleName() + "\r\n");
-            dialog.append("Message:"+ex.getLocalizedMessage());
+            dialog.setTitle(LanguageManager.tr("error.replay.title"));
+            dialog.append(LanguageManager.tr("error.replay.open",
+                    ex.getClass().getSimpleName(),
+                    ex.getLocalizedMessage()));
             dialog.setVisible(true);
             return;
         }
@@ -1131,7 +1466,6 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
     public void startLink()
     {
         System.out.printf("[%s] Start link\r\n", modbusPalProject.getName());
-        GUITools.setAllEnabled(linksTabbedPane,false);
 
         masterToggleButton.setEnabled(false);
         boolean isMaster = masterToggleButton.isSelected();
@@ -1164,6 +1498,9 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
             // start the master
             modbusMasterDialog.start(currentLink);
         }
+
+        // Keep a visible running state even without traffic.
+        ((TiltLabel)tiltLabel).setRunningState(true);
     }
 
 
@@ -1207,7 +1544,7 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
                
         
         masterToggleButton.setEnabled(true);
-        GUITools.setAllEnabled(linksTabbedPane,true);
+        ((TiltLabel)tiltLabel).setRunningState(false);
     }
 
 
@@ -1500,9 +1837,9 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
             scriptsToggleButton.setSelected(false);
             // create warning dialog
             ErrorMessage dialog = new ErrorMessage("Close");
-            dialog.setTitle("Scripts disabled");
-            dialog.append("It seems that Jython is not present on your computer. Scripting is disabled.");
-            dialog.append("If you need to use your scripts, go to http://www.jython.org and install Jython on your system.");
+            dialog.setTitle(LanguageManager.tr("script.disabled.title"));
+            dialog.append(LanguageManager.tr("script.disabled.message1"));
+            dialog.append(LanguageManager.tr("script.disabled.message2"));
             dialog.setVisible(true);
             return;
         }
@@ -1534,6 +1871,7 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
             helpViewer.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
             helpViewer.setExtendedState(JFrame.MAXIMIZED_BOTH);
         }
+        helpViewer.reloadLocalizedIndex();
 
         helpViewer.setVisible(true);
         helpViewer.toFront();
@@ -1558,6 +1896,7 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
     private void clearProjectButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearProjectButtonActionPerformed
 
         // TODO:
+        WorkspacePreferences.clearLastProjectPath();
         ModbusPalProject mpp = new ModbusPalProject();
         setProject(mpp);
         //ModbusPal.clearProject();
@@ -1620,9 +1959,8 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         ErrorMessage dialog = new ErrorMessage("Close");
-        dialog.setTitle("Serial link disabled");
-        dialog.append("It seems that RXTX is not present on your computer. Serial communication is disabled.");
-        dialog.append("If you need to use your COM ports, go to http://www.rxtx.org and install the RXTX library that suits your system.");
+        dialog.setTitle(LanguageManager.tr("error.serial.title"));
+        dialog.append(LanguageManager.tr("error.serial.no_ports"));
         dialog.setVisible(true);
     }//GEN-LAST:event_jButton1ActionPerformed
 
@@ -1644,6 +1982,69 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
     {
         stopLink();
         stopAllAutomations();
+    }
+
+    public void openProjectFromMenu()
+    {
+        loadButton.doClick();
+    }
+
+    public void saveProjectFromMenu()
+    {
+        saveProjectButton.doClick();
+    }
+
+    public void saveProjectAsFromMenu()
+    {
+        saveProjectAsButton.doClick();
+    }
+
+    public void clearProjectFromMenu()
+    {
+        clearProjectButton.doClick();
+    }
+
+    public void toggleMasterFromMenu()
+    {
+        masterToggleButton.doClick();
+    }
+
+    public void toggleScriptsFromMenu()
+    {
+        scriptsToggleButton.doClick();
+    }
+
+    public void openHelpFromMenu()
+    {
+        helpButton.doClick();
+    }
+
+    public void openDependencyCheckFromMenu()
+    {
+        if( dependencyCheckDialog == null )
+        {
+            Window w = SwingUtilities.getWindowAncestor(this);
+            if( w instanceof Frame )
+            {
+                dependencyCheckDialog = new DependencyCheckDialog((Frame) w);
+            }
+            else
+            {
+                dependencyCheckDialog = new DependencyCheckDialog((Frame) null);
+            }
+        }
+        dependencyCheckDialog.refreshReport();
+        GUITools.align(this, dependencyCheckDialog);
+        dependencyCheckDialog.setVisible(true);
+        dependencyCheckDialog.toFront();
+    }
+
+    public void toggleConsoleFromMenu()
+    {
+        if( consoleToggleButton.isEnabled() )
+        {
+            consoleToggleButton.doClick();
+        }
     }
 
 
@@ -1883,6 +2284,79 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
     }
 
     /**
+     * Performs a full application shutdown, including background links, automations,
+     * opened dialogs and finally JVM termination.
+     */
+    public void shutdownApplication()
+    {
+        synchronized(this)
+        {
+            if( shutdownInProgress )
+            {
+                return;
+            }
+            shutdownInProgress = true;
+        }
+
+        Thread shutdownThread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    persistWorkspaceBeforeExit();
+                    exit();
+
+                    if( modbusMasterDialog != null )
+                    {
+                        modbusMasterDialog.setVisible(false);
+                        modbusMasterDialog.dispose();
+                    }
+                    if( scriptManagerDialog != null )
+                    {
+                        scriptManagerDialog.setVisible(false);
+                        scriptManagerDialog.dispose();
+                    }
+                    if( console != null )
+                    {
+                        console.setVisible(false);
+                        console.dispose();
+                    }
+                    if( helpViewer != null )
+                    {
+                        helpViewer.setVisible(false);
+                        helpViewer.dispose();
+                    }
+                    if( dependencyCheckDialog != null )
+                    {
+                        dependencyCheckDialog.setVisible(false);
+                        dependencyCheckDialog.dispose();
+                    }
+
+                    java.awt.Window[] windows = java.awt.Window.getWindows();
+                    for( int i=0; i<windows.length; i++ )
+                    {
+                        try
+                        {
+                            windows[i].dispose();
+                        }
+                        catch(Exception ignored)
+                        {
+                        }
+                    }
+                }
+                finally
+                {
+                    System.exit(0);
+                }
+            }
+        }, "app-shutdown");
+        shutdownThread.setDaemon(false);
+        shutdownThread.start();
+    }
+
+    /**
      * @see #showScriptManagerDialog()
      * @param tabIndex the index of the tab to display
      * @deprecated tabIndex is ignored. now there is only one list of scripts
@@ -1948,7 +2422,8 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
                 try
                 {
                     loadProject(projectFile);
-                    //TODO: setTitle(APP_STRING+" ("+projectFile.getName()+")");
+                    WorkspacePreferences.setLastProjectPath(projectFile);
+                    refreshMainWindowTitle();
                 }
                 catch (Exception ex)
                 {
@@ -1974,7 +2449,8 @@ implements ModbusPalXML, WindowListener, ModbusPalListener, ModbusLinkListener
                 try
                 {
                     saveProject(projectFile);
-                    //TODO: setTitle(APP_STRING+" ("+projectFile.getName()+")");
+                    WorkspacePreferences.setLastProjectPath(projectFile);
+                    refreshMainWindowTitle();
                 }
                 catch (Exception ex)
                 {

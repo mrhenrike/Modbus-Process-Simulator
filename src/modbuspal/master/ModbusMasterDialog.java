@@ -21,6 +21,7 @@ import javax.swing.tree.TreeSelectionModel;
 import modbuspal.automation.Automation;
 import modbuspal.link.ModbusLink;
 import modbuspal.main.AddSlaveDialog;
+import modbuspal.main.LanguageManager;
 import modbuspal.main.ModbusPalListener;
 import modbuspal.main.ModbusPalProject;
 import modbuspal.main.ModbusPalPane;
@@ -50,7 +51,32 @@ implements ModbusPalListener
         setProject(p.getProject());
         threads = new ArrayList<Thread>();
         initComponents();
+        refreshLocalization();
         initTree();
+    }
+
+    public final void refreshLocalization()
+    {
+        setTitle(LanguageManager.tr("title.master", ModbusPalPane.APP_NAME));
+        removeButton.setText(LanguageManager.tr("master.remove"));
+        modifyButton.setText(LanguageManager.tr("master.modify"));
+        updateAddButtonLabel(null);
+    }
+
+    private void updateAddButtonLabel(Object selection)
+    {
+        if( selection instanceof ModbusMasterTask )
+        {
+            addButton.setText(LanguageManager.tr("master.add_target"));
+        }
+        else if( selection instanceof ModbusMasterTarget || selection instanceof ModbusMasterRequest )
+        {
+            addButton.setText(LanguageManager.tr("master.add_request"));
+        }
+        else
+        {
+            addButton.setText(LanguageManager.tr("master.add_task"));
+        }
     }
 
     public void setProject(ModbusPalProject p)
@@ -259,7 +285,7 @@ implements ModbusPalListener
         modifyButton = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
-        setTitle("ModbusPal Master");
+        setTitle(LanguageManager.tr("title.master", ModbusPalPane.APP_NAME));
         setMinimumSize(new java.awt.Dimension(300, 300));
 
         jTree1.addTreeSelectionListener(new javax.swing.event.TreeSelectionListener() {
@@ -345,26 +371,11 @@ implements ModbusPalListener
         
         if( o == null )
         {
-            addButton.setText("Add task...");
+            updateAddButtonLabel(null);
         }
         else
         {
-            if( o instanceof ModbusMasterTask )
-            {
-                addButton.setText("Add target...");
-            }
-            else if( o instanceof ModbusMasterTarget )
-            {
-                addButton.setText("Add request...");
-            }
-            else if(o instanceof ModbusMasterRequest )
-            {
-                addButton.setText("Add request...");
-            }
-            else
-            {
-                addButton.setText("Add task...");
-            }
+            updateAddButtonLabel(o);
         }
     }//GEN-LAST:event_jTree1ValueChanged
 

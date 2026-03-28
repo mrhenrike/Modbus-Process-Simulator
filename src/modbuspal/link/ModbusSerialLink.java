@@ -6,6 +6,7 @@
 package modbuspal.link;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.util.Enumeration;
 import gnu.io.*;
 import java.io.File;
@@ -33,6 +34,7 @@ public class ModbusSerialLink
 extends ModbusSlaveProcessor
 implements ModbusLink, Runnable, SerialPortEventListener
 {
+    private static final Logger LOGGER = Logger.getLogger(ModbusSerialLink.class.getName());
     /** identifier to specify that there is no parity for the serial communication */
     public static final int PARITY_NONE = 0;
     
@@ -122,6 +124,16 @@ implements ModbusLink, Runnable, SerialPortEventListener
         return new CommPortList();
     }
 
+    /**
+     * RXTX legacy driver relies on java.ext.dirs, which does not exist in modern JDKs.
+     * @return true when runtime still exposes java.ext.dirs
+     */
+    public static boolean isLegacyExtDirsAvailable()
+    {
+        String extDirs = System.getProperty("java.ext.dirs");
+        return extDirs != null;
+    }
+
         
     private static boolean installOnWindows() 
     throws IOException
@@ -181,6 +193,16 @@ implements ModbusLink, Runnable, SerialPortEventListener
      */
     public static boolean enumerate()
     {
+        if( System.getProperty("java.ext.dirs") == null )
+        {
+            System.setProperty("java.ext.dirs", "");
+        }
+        commPorts.clear();
+        if( isLegacyExtDirsAvailable() == false )
+        {
+            LOGGER.log(Level.INFO, "Serial disabled: java.ext.dirs is unavailable in this JVM runtime.");
+            return false;
+        }
         try
         {
             Enumeration portList = CommPortIdentifier.getPortIdentifiers();
@@ -195,8 +217,10 @@ implements ModbusLink, Runnable, SerialPortEventListener
             }
             return true;
         }
-        catch(Exception ex)
+        catch(Throwable ex)
         {
+            LOGGER.log(Level.INFO, "Serial disabled: RXTX initialization failed ({0}: {1})",
+                    new Object[] { ex.getClass().getSimpleName(), ex.getLocalizedMessage() });
             return false;
         }
     }
@@ -209,6 +233,7 @@ implements ModbusLink, Runnable, SerialPortEventListener
     private Thread serverThread;
     private int serialParity;
     private int flowControl;
+    private final boolean asciiMode;
     private ModbusLinkListener listener = null;
 
     /**
@@ -225,7 +250,14 @@ implements ModbusLink, Runnable, SerialPortEventListener
     public ModbusSerialLink(ModbusPalProject mpp, int index, int speed, int parity, int stopBits, boolean xonxoff, boolean rtscts)
     throws PortInUseException, ClassCastException
     {
+        this(mpp, index, speed, parity, stopBits, xonxoff, rtscts, false);
+    }
+
+    public ModbusSerialLink(ModbusPalProject mpp, int index, int speed, int parity, int stopBits, boolean xonxoff, boolean rtscts, boolean ascii)
+    throws PortInUseException, ClassCastException
+    {
         super(mpp);
+        asciiMode = ascii;
 
         CommPortIdentifier comm = commPorts.get(index);
         serialPort = (SerialPort)(comm.open("MODBUSPAL",3000));
@@ -378,6 +410,119 @@ implements ModbusLink, Runnable, SerialPortEventListener
         return CRC;
     }
 
+    static int computeLRC(byte[] buffer, int offset, int length)
+    {
+        int sum = 0;
+        for( int i=0; i<length; i++ )
+        {
+            sum = (sum + (buffer[offset + i] & 0xFF)) & 0xFF;
+        }
+        return ((-sum) & 0xFF);
+    }
+
+    private static int parseHexNibble(char c)
+    {
+        if( c >= '0' && c <= '9' ) return c - '0';
+        if( c >= 'a' && c <= 'f' ) return 10 + (c - 'a');
+        if( c >= 'A' && c <= 'F' ) return 10 + (c - 'A');
+        return -1;
+    }
+
+    private static byte[] encodeAsciiFrame(byte[] payload, int len)
+    {
+        StringBuilder sb = new StringBuilder(2 + (len * 2));
+        sb.append(':');
+        for( int i=0; i<len; i++ )
+        {
+            sb.append(String.format("%02X", payload[i] & 0xFF));
+        }
+        sb.append("\r\n");
+        return sb.toString().getBytes();
+    }
+
+    private int readAsciiFrame(byte[] buffer) throws IOException
+    {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        boolean started = false;
+        long startTs = System.currentTimeMillis();
+
+        while( System.currentTimeMillis() - startTs < 1500 )
+        {
+            while( input.available() > 0 )
+            {
+                int r = input.read();
+                if( r < 0 ) break;
+                if( started == false )
+                {
+                    if( r == ':' )
+                    {
+                        started = true;
+                        baos.write(r);
+                    }
+                    continue;
+                }
+                baos.write(r);
+                if( r == '\n' )
+                {
+                    byte[] data = baos.toByteArray();
+                    if( data.length > buffer.length )
+                    {
+                        return -1;
+                    }
+                    System.arraycopy(data, 0, buffer, 0, data.length);
+                    return data.length;
+                }
+            }
+            if( started )
+            {
+                try
+                {
+                    Thread.sleep(5);
+                }
+                catch(InterruptedException ignored)
+                {
+                    Thread.currentThread().interrupt();
+                    return -1;
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+        return -1;
+    }
+
+    private int decodeAsciiPayload(byte[] asciiFrame, int frameLen, byte[] payload) throws IOException
+    {
+        String frame = new String(asciiFrame, 0, frameLen).trim();
+        if( frame.isEmpty() || frame.charAt(0) != ':' )
+        {
+            throw new IOException("Invalid ASCII frame start.");
+        }
+        String hex = frame.substring(1).replace(" ", "");
+        if( (hex.length() % 2) != 0 )
+        {
+            throw new IOException("Invalid ASCII frame length.");
+        }
+        int payloadLen = hex.length() / 2;
+        if( payloadLen > payload.length )
+        {
+            throw new IOException("ASCII payload too long.");
+        }
+        for( int i=0; i<payloadLen; i++ )
+        {
+            int hi = parseHexNibble(hex.charAt(i * 2));
+            int lo = parseHexNibble(hex.charAt(i * 2 + 1));
+            if( hi < 0 || lo < 0 )
+            {
+                throw new IOException("Invalid ASCII hexadecimal payload.");
+            }
+            payload[i] = (byte)((hi << 4) | lo);
+        }
+        return payloadLen;
+    }
+
     @Override
     public void run()
     {
@@ -398,6 +543,45 @@ implements ModbusLink, Runnable, SerialPortEventListener
                 // if some data is available then:
                 if( input.available() >= 1 )
                 {
+                    if( asciiMode )
+                    {
+                        int asciiLen = readAsciiFrame(buffer);
+                        if( asciiLen <= 0 )
+                        {
+                            continue;
+                        }
+                        byte[] payload = new byte[512];
+                        int payloadLen = decodeAsciiPayload(buffer, asciiLen, payload);
+                        if( payloadLen < 3 )
+                        {
+                            continue;
+                        }
+
+                        int slaveID = ModbusTools.getUint8(payload, 0);
+                        int receivedLRC = ModbusTools.getUint8(payload, payloadLen - 1);
+                        int computedLRC = computeLRC(payload, 0, payloadLen - 1);
+                        int pduLength = payloadLen - 2;
+
+                        if( receivedLRC == computedLRC )
+                        {
+                            pduLength = processPDU(new ModbusSlaveAddress(slaveID), payload, 1, pduLength);
+                        }
+                        else
+                        {
+                            pduLength = makeExceptionResponse(XC_SLAVE_DEVICE_FAILURE, payload, 1);
+                        }
+
+                        if( pduLength > 0 )
+                        {
+                            int outLen = 1 + pduLength + 1;
+                            payload[outLen - 1] = (byte)computeLRC(payload, 0, outLen - 1);
+                            byte[] asciiOut = encodeAsciiFrame(payload, outLen);
+                            output.write(asciiOut);
+                            output.flush();
+                        }
+                        continue;
+                    }
+
                     // read all available data
                     int totalLen = input.read(buffer);
 
@@ -520,6 +704,45 @@ implements ModbusLink, Runnable, SerialPortEventListener
     throws IOException
     {
         byte buffer[] = new byte[2048];
+
+        if( asciiMode )
+        {
+            int length = buildPDU(req, dst, buffer, 1);
+            ModbusTools.setUint8(buffer, 0, dst.getRtuAddress());
+            int totalPayload = 1 + length + 1;
+            buffer[totalPayload - 1] = (byte)computeLRC(buffer, 0, totalPayload - 1);
+            byte[] asciiOut = encodeAsciiFrame(buffer, totalPayload);
+            output.write(asciiOut);
+            output.flush();
+
+            synchronized(input)
+            {
+                try
+                {
+                    input.wait(timeout);
+                }
+                catch (InterruptedException ex)
+                {
+                    Logger.getLogger(ModbusSerialLink.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+
+            if( input.available() >= 1 )
+            {
+                int asciiLen = readAsciiFrame(buffer);
+                if( asciiLen <= 0 ) return;
+                byte[] payload = new byte[512];
+                int payloadLen = decodeAsciiPayload(buffer, asciiLen, payload);
+                if( payloadLen < 3 ) return;
+                int receivedLRC = ModbusTools.getUint8(payload, payloadLen - 1);
+                int computedLRC = computeLRC(payload, 0, payloadLen - 1);
+                if( receivedLRC == computedLRC )
+                {
+                    processPDU(req, dst, payload, 1, payloadLen - 2);
+                }
+            }
+            return;
+        }
         
         // genete PDU of the request, start at offset 1
         // (leave room for header and footer).

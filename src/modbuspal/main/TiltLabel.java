@@ -24,6 +24,7 @@ implements Runnable
     public static final int YELLOW = 2;
     public static final int GREEN = 3;
     private int tiltColor=0;
+    private boolean runningState=false;
     private boolean execute=false;
     private Thread thread=null;
     private ImageIcon grayIcon;
@@ -85,6 +86,23 @@ implements Runnable
         }
     }
 
+    public void setRunningState(boolean running)
+    {
+        synchronized(this)
+        {
+            runningState = running;
+            if( running == false )
+            {
+                tiltColor = 0;
+                setIcon(grayIcon);
+            }
+            else
+            {
+                setIcon(yellowIcon);
+            }
+        }
+    }
+
     @Override
     public void run()
     {
@@ -116,7 +134,13 @@ implements Runnable
                         case RED: setIcon(redIcon); break;
                         case YELLOW: setIcon(yellowIcon); break;
                         case GREEN: setIcon(greenIcon); break;
-                        default: tilted = false; break;
+                        default:
+                            tilted = false;
+                            if( runningState )
+                            {
+                                setIcon(yellowIcon);
+                            }
+                            break;
                     }
                 }
                 tiltColor=0;

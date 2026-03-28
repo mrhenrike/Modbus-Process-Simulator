@@ -46,13 +46,13 @@ extends DefaultMutableTreeNode
         treeSelectionModel = null;
     }
     
-    void setTaskName(String s) 
+    public void setTaskName(String s) 
     {
         taskName = s;
         setUserObject(s);
     }
     
-    String getTaskName()
+    public String getTaskName()
     {
         return taskName;
     }
