@@ -155,3 +155,12 @@ __Or mount your project and refer to it via environment variables__
 1. Build Project (click hammer or F11)
 2. Jar will be in [ProjectFolder]/dist
 
+---
+
+<!-- LEGAL-NOTICE-UG-MRH -->
+
+## Legal notice / aviso legal
+
+This project is licensed under the **Apache License 2.0** — see [LICENSE](LICENSE) and [NOTICE](NOTICE). **No warranty** beyond what the license states; **no liability** for misuse of industrial protocols or unauthorized testing — use only in **authorized** lab or customer engagements. **Pull requests** and **issues** are welcome; preserve **attribution** to upstream ModbusPal/authors.
+
+Este projeto usa **Apache License 2.0** — ver [LICENSE](LICENSE) e [NOTICE](NOTICE). **Sem garantias** adicionais; **sem responsabilidade** por uso indevido — use apenas em ambientes **autorizados**. Contribuições via **pull request** são bem-vindas.
