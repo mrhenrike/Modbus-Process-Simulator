@@ -1,5 +1,7 @@
 # Modbus Process Simulator v1.9.0 by @mrhenrike
 ModbusPal - a Java MODBUS simulator
+
+**Portuguese (pt-BR):** [README.pt-BR.md](README.pt-BR.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [Wiki](https://github.com/mrhenrike/Modbus-Process-Simulator/wiki)
 - Forked by https://sourceforge.net/projects/modbuspal/
 - Changed by André Henrique (Twitter @mrhenrike / LinkedIn @mrhenrike)
 
